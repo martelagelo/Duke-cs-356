@@ -7,14 +7,30 @@
 #include <stdlib.h>
 
 
+#define MAX_NUM_ROUTING_ENTRIES 64
+
+typedef struct port {
+    uint32_t dest_addr;
+    uint32_t next_hop;
+    int interface_id;
+    int cost;
+    int state;
+} port_t;
+
+typedef struct forwarding_table {
+    int num_entries;
+    port_t forwarding_entries[MAX_NUM_ROUTING_ENTRIES];
+} for_table_t;
+
 typedef struct rip_packet {
 	uint16_t command;
 	uint16_t num_entries;
+
 	struct {
 		uint32_t cost;
 		uint32_t address;
-	} entries[num_entries];
-}
+	} entries[MAX_NUM_ROUTING_ENTRIES];
+} rip_packet_t;
 
 /* Notes:
     rip algorithm cases: http://en.wikipedia.org/wiki/Routing_Information_Protocol
@@ -22,7 +38,7 @@ typedef struct rip_packet {
 
 */
 
-void chooseCommand(char * command) {
+void choose_command(char * command) {
     if(strcmp("ifconfig", command) == 0) {
         //do dis 
         printf("ifconfig\n");
@@ -54,15 +70,15 @@ int main(int argc, char ** argv) {
     // setup non-blocking UDP send socket
     // initialize routing information
 
-    fd_set active_fd_set, readSet;
+    fd_set active_fd_set, read_set;
     fd_set *active_set_ptr;
 
     active_set_ptr = & active_fd_set;
 
     FD_ZERO (&active_fd_set);
-    FD_SET (0, &active_fd_set);
+    FD_SET (1, &active_fd_set);
 
-    char commandLine[50];
+    char command_line[50];
 
     while (1) {
     	// check for user input
@@ -70,17 +86,17 @@ int main(int argc, char ** argv) {
     	// check for recieved packet
     		// handle
 
-        readSet = active_fd_set;
+        read_set = active_fd_set;
 
-        if (select (FD_SETSIZE, &readSet, NULL, NULL, NULL) < 0){ 
+        if (select (FD_SETSIZE, &read_set, NULL, NULL, NULL) < 0){ 
             perror ("select error");
             exit (EXIT_FAILURE);
         }
 
-        if(FD_ISSET(0, &readSet)) {
-            scanf("%s", commandLine);
+        if(FD_ISSET(1, &read_set)) {
+            scanf("%s", command_line);
             //printf( "\n%s", commandLine);
-            chooseCommand(commandLine);
+            choose_command(command_line);
         }
 
     }
