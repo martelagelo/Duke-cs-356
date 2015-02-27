@@ -1,5 +1,13 @@
 
 
+typedef struct rip_packet {
+	uint16_t command;
+	uint16_t num_entries;
+	struct {
+		uint32_t cost;
+		uint32_t address;
+	} entries[num_entries];
+}
 
 /* Notes:
     rip algorithm cases: http://en.wikipedia.org/wiki/Routing_Information_Protocol
@@ -18,5 +26,4 @@ int main(int argc, char ** argv) {
     	// check for recieved packet
     		// handle
     }
-
 }
