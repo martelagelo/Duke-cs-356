@@ -61,6 +61,23 @@ void send_packet() {
 
 }
 
+void set_as_up(int ID) {
+    int i;
+    for(i = 0; i < IFCONFIG_TABLE.num_entries; i++) {
+        if(IFCONFIG_TABLE.ifconfig_entries[i].interface_id == ID) {
+            IFCONFIG_TABLE.ifconfig_entries[i].state == "up";
+            printf("Interface %d is up.\n", ID);
+            return;
+        }
+    }
+    //Needs to also update forwarding table and network table
+    printf("Interface %d is not found.\n", ID);
+}
+
+void set_as_down(int ID) {
+
+}
+
 void print_routes() {
     printf("Start finding routes....\n");
     int i;
@@ -91,6 +108,7 @@ void choose_command(char * command) {
     else if (strcmp("up", command) == 0) {
         //do this other thing
         printf("up\n");
+
     }
     else if (strcmp("down", command) == 0) {
         //do this other thing
