@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+
 typedef struct rip_packet {
 	uint16_t command;
 	uint16_t num_entries;
@@ -81,5 +82,6 @@ int main(int argc, char ** argv) {
             //printf( "\n%s", commandLine);
             chooseCommand(commandLine);
         }
+
     }
 }
