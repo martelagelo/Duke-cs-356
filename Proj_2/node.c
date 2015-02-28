@@ -54,10 +54,21 @@ ifconfig_table_t IFCONFIG_TABLE;
 
 
 void build_forwarding_table() {
-
+    
 }
 
-void send_packet() {
+void send_packet(uint32_t destination, char * msg) {
+    int i;
+    for(i = 0; i < FORWARDING_TABLE.num_entries; i++) {
+        if(FORWARDING_TABLE.forwarding_entries[i].dest_addr == destination) {
+            //send message
+            return;
+        }
+    }
+    printf("Path does not exist\n");
+}
+
+void forward_packet() {
 
 }
 
@@ -75,7 +86,16 @@ void set_as_up(int ID) {
 }
 
 void set_as_down(int ID) {
-
+    int i;
+    for(i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
+        if(IFCONFIG_TABLE.ifconfig_entries[i].interface_id == ID) {
+            IFCONFIG_TABLE.ifconfig_entries[i].state == "down";
+            printf("Interface %d is down.\n", ID);
+            return;
+        }
+    }
+    //Needs to also update forwarding table and network table
+    printf("Interface %d is not found.\n", ID);
 }
 
 void print_routes() {
@@ -107,12 +127,12 @@ void choose_command(char * command) {
     }
     else if (strcmp("up", command) == 0) {
         //do this other thing
-        printf("up\n");
+        set_as_up();
 
     }
     else if (strcmp("down", command) == 0) {
         //do this other thing
-        printf("down\n");
+        set_as_down();
     }
     else if (strcmp("send", command) == 0) { 
         //send
