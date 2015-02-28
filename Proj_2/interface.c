@@ -57,7 +57,7 @@ void Interface::send_packet(char * data, struct iphdr * ip_header) {
     dest_addr.sin_family = AF_INET;
     dest_addr.sin_port = htons(other_port);
 
-    if (sendto(send_socket, data, ip_header->tot_len, 0, (struct sockaddr*) &dest_addr, sizeof(dest_addr)) == -1) {
+    if (sendto(send_socket, data, ip_header->tot_len, 0, (struct sockaddr*) &dest_addr, sizeof(dest_addr)) < 0) {
         perror("Failed to send packet");
     }
 }

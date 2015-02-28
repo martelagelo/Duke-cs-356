@@ -5,7 +5,8 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <stdlib.h>
-
+#include <stdint.h>
+#include <fcntl.h>
 
 #define MAX_NUM_ROUTING_ENTRIES 64
 
@@ -125,19 +126,49 @@ void choose_command(char * command) {
 }
 
 
+int init_listen_socket(int port, fd_set * running_fd_set){
+    int listen_socket;
+    struct sockaddr_in server_addr;
+
+    bzero((char *)&server_addr, sizeof(server_addr));
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+
+    if ((listen_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { //UDP socket listening for anything
+        perror("Create socket error: ");
+        exit(1);
+    }
+
+    if ((bind(listen_socket, (struct sockaddr *)&server_addr, sizeof(server_addr))) < 0) {
+         perror("Bind error: ");
+         exit(1);
+    }
+
+    FD_SET (listen_socket, running_fd_set);
+
+    fcntl( listen_socket,  F_SETFL,  O_NONBLOCK, 1); // non-blocking interactions
+
+    return listen_socket;
+}
+
 int main(int argc, char ** argv) {
     // Initialize based on input file
-    // setup non-blocking UDP recieve socket
-    // setup non-blocking UDP send socket
-    // initialize routing information
+    
 
+
+    // initialize routing information
+    int listen_socket;
     fd_set running_set, read_set;
     fd_set *running_ptr;
 
     running_ptr = & running_set;
 
+
     FD_ZERO (&running_set);
     FD_SET (1, &running_set);
+
+    listen_socket = init_listen_socket(7000, running_ptr);
 
     char command_line[50];
 
@@ -150,15 +181,14 @@ int main(int argc, char ** argv) {
         read_set = running_set;
 
         if (select (FD_SETSIZE, &read_set, NULL, NULL, NULL) < 0){ 
-            perror ("select error");
+            perror ("Select error: ");
             exit (EXIT_FAILURE);
         }
 
-        if(FD_ISSET(1, &read_set)) {
+        if (FD_ISSET(1, &read_set)) {
             scanf("%s", command_line);
             //printf( "\n%s", commandLine);
             choose_command(command_line);
         }
-
     }
 }
