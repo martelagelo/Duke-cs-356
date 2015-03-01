@@ -15,10 +15,11 @@ using namespace std;
 #define MAX_NUM_ROUTING_ENTRIES 64
 #define LOCALHOST "127.0.0.1"
 #define IP_ADDR_LEN 16
-
+#define MAX_TTL 16
 #define MAX_MTU_SIZE 1400
 #define MAX_RECV_SIZE (1024 * 64) // 64 KB
 #define TEST_PROTOCOL_VAL 0
+#define RIP_PROTOCOL_VAL 200
 
 typedef struct interface {
     int interface_id;
@@ -97,17 +98,27 @@ void send_packet_with_interface(interface_t * interface, char * data, struct iph
 
 void create_ifconfig_entry(int ID, uint16_t port, char *myIP, char *myVIP, char *otherVIP) {
     interface_t entry;
-    entry->interface_id = ID;
-    entry->my_port = port;
-    strcpy(entry->my_ip,myIP);
-    strcpy(entry->my_vip,myVIP);
-    strcpy(entry->other_vip,otherVIP);
-    entry->is_up = true;
-    entry->mtu_size = MAX_MTU_SIZE;
+    entry.interface_id = ID;
+    entry.my_port = port;
+    strcpy(entry.my_ip,myIP);
+    strcpy(entry.my_vip,myVIP);
+    strcpy(entry.other_vip,otherVIP);
+    entry.is_up = true;
+    entry.mtu_size = MAX_MTU_SIZE;
 
-    IFCONFIG_TABLE.ifconfig_entries[ID] = *entry;
+    IFCONFIG_TABLE.ifconfig_entries[ID] = entry;
     IFCONFIG_TABLE.num_entries++;
-    initialize_interface(entry);
+    initialize_interface(&entry);
+}
+
+void create_forwarding_entry(int ID, char * dest_addr, int cost) {
+    forwarding_entry_t entry;
+    entry.interface_id = ID;
+    strcpy(entry.dest_addr,dest_addr);
+    entry.cost = cost;
+
+    FORWARDING_TABLE.forwarding_entries[ID] = entry;
+    FORWARDING_TABLE.num_entries++;
 }
 
 void build_tables(FILE *fp) {
@@ -117,7 +128,7 @@ void build_tables(FILE *fp) {
 
     ID = 0;
     while(feof(fp) == false) {
-        fscanf(fp, "%s %s %s", other_port, other_vip, my_vip);
+        fscanf(fp, "%s %s %s", other_port, my_vip, other_vip);
         
         strcpy(myIP, strtok (other_port,":"));
         if(strcmp(myIP, "localhost")==0) {
@@ -125,6 +136,8 @@ void build_tables(FILE *fp) {
         } 
         port = atoi(strtok (NULL,": "));
         create_ifconfig_entry(ID, port, myIP, my_vip, other_vip);
+
+        create_forwarding_entry(ID, other_vip, 1);
 
         //update forwarding_table
         ID++;
@@ -162,6 +175,17 @@ void load_from_file() {
    fclose(fp);
 }
 
+// bool is_dest_equal_to_me(char * dest_addr) {
+//     interface_t * temp = IFCONFIG_TABLE.ifconfig_entries;
+//     int i;
+//     for (i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
+//         if(strcmp(IFCONFIG_TABLE.ifconfig_entries[i].my_vip, dest_addr)) {
+//             return true;
+//         }
+//     }
+//     return false;
+// }
+
 interface_t* get_interface_by_id(int id) {
     interface_t * temp = IFCONFIG_TABLE.ifconfig_entries;
     int i;
@@ -184,27 +208,28 @@ interface_t* get_interface_by_dest_addr(char * dest_addr) {
     return NULL;
 }
 
-forwarding_entry_t* get_forwarding_entry_by_id(int id) {
+forwarding_entry_t* get_forwarding_entry_by_dest_addr(char * dest_addr) {
     forwarding_entry_t * temp = FORWARDING_TABLE.forwarding_entries;
     int i;
     for(i = 0; i< FORWARDING_TABLE.num_entries; i++) {
-        if(FORWARDING_TABLE.forwarding_entries[i].interface_id == id) {
+        if(strcmp(FORWARDING_TABLE.forwarding_entries[i].dest_addr, dest_addr)) {
             return (temp + i);
         }
     }
     return NULL;
 }
 
-void send_packet(char * dest_addr, char * msg, int TTL, int protocol) {
-    interface_t * interface = get_interface_by_dest_addr(dest_addr);
-    if (interface == NULL) {
-        printf("Path does not exist.\n");
+void send_packet(char * dest_addr, char * msg, int msg_size, int TTL, int protocol) {
+    
+    forwarding_entry_t *f_entry = get_forwarding_entry_by_dest_addr(dest_addr);
+    if (f_entry == NULL) {
+        printf("Path does not exist in forwarding table.");
         return;
     }
 
-    forwarding_entry_t * f_entry = get_forwarding_entry_by_id(interface->interface_id);
-    if (f_entry == NULL) {
-        printf("Path does not exist in forwarding table.");
+    interface_t * interface = get_interface_by_id(f_entry -> interface_id);
+    if (interface == NULL) {
+        printf("Path does not exist.\n");
         return;
     }
 
@@ -214,7 +239,7 @@ void send_packet(char * dest_addr, char * msg, int TTL, int protocol) {
     struct iphdr * ip_header = (struct iphdr*) packet;
 
     ip_header -> id = rand();
-    ip_header -> saddr = inet_addr(interface -> my_vip);
+    ip_header -> saddr = inet_addr(interface->my_vip);
     ip_header -> daddr = inet_addr(f_entry -> dest_addr);
     ip_header -> version = 4;
     ip_header -> ttl = TTL;
@@ -251,13 +276,13 @@ void set_as_down(int ID) {
 }
 
 void print_routes() {
-    printf("Start finding routes....\n");
+    printf("\nStart finding routes....\n");
     int i;
     for (i = 0; i < FORWARDING_TABLE.num_entries; ++i) {
         forwarding_entry_t entry = FORWARDING_TABLE.forwarding_entries[i];
-        printf("%s %d %d\n", entry.dest_addr, entry.cost, entry.interface_id);
+        printf("%s %d %d\n", entry.dest_addr, entry.interface_id, entry.cost);
     }
-    printf("....end finding routes.\n");
+    printf("....end finding routes.\n\n");
 }
 
 void print_ifconfig() {
@@ -290,7 +315,7 @@ void choose_command(char * command) {
         char *msg, *dest_addr;
         scanf("%s %[^\n]s", dest_addr, msg);
         printf("destination: %s     message: %s", dest_addr, msg);
-        //send_packet();
+        send_packet(dest_addr, msg, strlen(msg), MAX_TTL, TEST_PROTOCOL_VAL);
     }
     else if (strcmp("die", command) == 0) { 
         printf("....*BANG*-*clatter*-*thud*.......\n");
@@ -392,7 +417,6 @@ int main(int argc, char ** argv) {
     		// handle
     	// check for received packet
     		// handle
-        printf("Enter a command.");
 
         need_to_read_set = full_fd_set;
 
