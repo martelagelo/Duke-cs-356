@@ -12,9 +12,11 @@
 using namespace std;
 
 #define MAX_NUM_ROUTING_ENTRIES 64
-#define MAX_MTU_SIZE 1400
 #define LOCALHOST "127.0.0.1"
 #define IP_ADDR_LEN 16
+
+#define MAX_MTU_SIZE 1400
+#define MAX_RECV_SIZE (1024 * 64) // 64 KB
 
 typedef struct interface {
     int interface_id;
@@ -158,7 +160,7 @@ void build_tables() {
 interface_t* get_interface_by_id(int id) {
     interface_t * temp = IFCONFIG_TABLE.ifconfig_entries;
     int i;
-    for(i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
+    for (i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
         if(IFCONFIG_TABLE.ifconfig_entries[i].interface_id == id) {
             return (temp + i);
         }
@@ -169,7 +171,7 @@ interface_t* get_interface_by_id(int id) {
 interface_t* get_interface_by_dest_addr(char * dest_addr) {
     interface_t * temp = IFCONFIG_TABLE.ifconfig_entries;
     int i;
-    for(i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
+    for (i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
         if(strcmp(IFCONFIG_TABLE.ifconfig_entries[i].other_vip, dest_addr) == 0) {
             return (temp + i);
         }
@@ -286,9 +288,22 @@ int init_listen_socket(int port, fd_set * running_fd_set){
 
     FD_SET (listen_socket, running_fd_set);
 
-    fcntl( listen_socket,  F_SETFL,  O_NONBLOCK, 1); // non-blocking interactions
+    fcntl(listen_socket,  F_SETFL,  O_NONBLOCK, 1); // non-blocking interactions
 
     return listen_socket;
+}
+
+void handle_packet(int listen_socket) {
+    char recv_buffer[MAX_RECV_SIZE];
+    struct iphdr * recv_header;
+    char * recv_data;
+
+    recv(listen_socket, recv_buffer, MAX_RECV_SIZE, 0);
+
+    recv_header = (struct iphdr *) recv_buffer;
+    recv_data = (recv_buffer + recv_header->ihl * sizeof(char));
+
+
 }
 
 int main(int argc, char ** argv) {
@@ -305,9 +320,9 @@ int main(int argc, char ** argv) {
 
 
     FD_ZERO (&full_fd_set);
-    FD_SET (1, &full_fd_set);
+    FD_SET (0, &full_fd_set);
 
-    listen_socket = init_listen_socket(7000, running_ptr);
+    listen_socket = init_listen_socket(SELF.port, running_ptr);
 
     char command_line[100];
 
@@ -325,7 +340,7 @@ int main(int argc, char ** argv) {
             exit (EXIT_FAILURE);
         }
 
-        if (FD_ISSET(1, &need_to_read_set)) {
+        if (FD_ISSET(0, &need_to_read_set)) {
             scanf("%s", command_line);
             //printf( "\n%s", commandLine);
             choose_command(command_line);
