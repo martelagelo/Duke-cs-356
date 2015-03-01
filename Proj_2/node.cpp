@@ -83,15 +83,21 @@ void initialize_interface(interface_t * interface) {
 }
 
 void send_packet_with_interface(interface_t * interface, char * data, struct iphdr * ip_header) {
+    char full_packet[MAX_MTU_SIZE];
     if (!interface->is_up) return;
 
     struct sockaddr_in dest_addr;
 
-    dest_addr.sin_addr.s_addr = inet_addr(interface->other_ip);
+    dest_addr.sin_addr.s_addr = inet_addr(interface->my_ip);
     dest_addr.sin_family = AF_INET;
-    dest_addr.sin_port = htons(interface->other_port);
+    dest_addr.sin_port = htons(interface->my_port);
 
-    if (sendto(interface->send_socket, data, ip_header->tot_len, 0, (struct sockaddr*) &dest_addr, sizeof(dest_addr)) < 0) {
+    ip_header->ihl = 5;
+    ip_header->tot_len = ip_header->ihl * 4 + strlen(data) * 4;
+    ip_header->check = ip_sum((char*)ip_header, ip_header->ihl * 4);
+    memcpy(full_packet, ip_header, ip_header->ihl*4);
+    memcpy(full_packet+ip_header->ihl*4, data, strlen(data));
+    if (sendto(interface->send_socket, full_packet, ip_header->tot_len, 0, (struct sockaddr*) &dest_addr, sizeof(dest_addr)) < 0) {
         perror("Failed to send packet");
     }
 }
@@ -106,9 +112,9 @@ void create_ifconfig_entry(int ID, uint16_t port, char *myIP, char *myVIP, char 
     entry.is_up = true;
     entry.mtu_size = MAX_MTU_SIZE;
 
+    initialize_interface(&entry);
     IFCONFIG_TABLE.ifconfig_entries[ID] = entry;
     IFCONFIG_TABLE.num_entries++;
-    initialize_interface(&entry);
 }
 
 void create_forwarding_entry(int ID, char * dest_addr, int cost) {
@@ -212,7 +218,7 @@ forwarding_entry_t* get_forwarding_entry_by_dest_addr(char * dest_addr) {
     forwarding_entry_t * temp = FORWARDING_TABLE.forwarding_entries;
     int i;
     for(i = 0; i< FORWARDING_TABLE.num_entries; i++) {
-        if(strcmp(FORWARDING_TABLE.forwarding_entries[i].dest_addr, dest_addr)) {
+        if(strcmp(FORWARDING_TABLE.forwarding_entries[i].dest_addr, dest_addr) == 0) {
             return (temp + i);
         }
     }
@@ -220,16 +226,18 @@ forwarding_entry_t* get_forwarding_entry_by_dest_addr(char * dest_addr) {
 }
 
 void send_packet(char * dest_addr, char * msg, int msg_size, int TTL, int protocol) {
+    forwarding_entry_t *f_entry;
+    interface_t * interface;
 
-    forwarding_entry_t *f_entry = get_forwarding_entry_by_dest_addr(dest_addr);
+    f_entry = get_forwarding_entry_by_dest_addr(dest_addr);
     if (f_entry == NULL) {
-        printf("Path does not exist in forwarding table.");
+        printf("\nPath does not exist in forwarding table.");
         return;
     }
 
-    interface_t * interface = get_interface_by_id(f_entry -> interface_id);
+    interface = get_interface_by_id(f_entry -> interface_id);
     if (interface == NULL) {
-        printf("Path does not exist.\n");
+        printf("Path does not exist in ifconfig table.\n");
         return;
     }
 
@@ -244,6 +252,9 @@ void send_packet(char * dest_addr, char * msg, int msg_size, int TTL, int protoc
     ip_header -> version = 4;
     ip_header -> ttl = TTL;
     ip_header -> protocol = protocol;
+    ip_header -> tot_len = MAX_MTU_SIZE;
+
+    printf("\n\n\n\n\ngot here\n\n\n\n\n");
 
     send_packet_with_interface(interface, msg, ip_header);
     return;
@@ -314,7 +325,7 @@ void choose_command(char * command) {
     else if (strcmp("send", command) == 0) { 
         char dest_addr[20], msg[MAX_MTU_SIZE];
         scanf("%s %[^\n]s", dest_addr, msg);
-        printf("destination: %s     message: %s", dest_addr, msg);
+        printf("destination: %s message: %s", dest_addr, msg);
         send_packet(dest_addr, msg, strlen(msg), MAX_TTL, TEST_PROTOCOL_VAL);
     }
     else if (strcmp("die", command) == 0) { 
@@ -363,16 +374,16 @@ void handle_packet(int listen_socket) {
     memset(&recv_buffer[0], 0, (MAX_RECV_SIZE * sizeof(char)));
 
     recv(listen_socket, recv_buffer, MAX_RECV_SIZE, 0);
-
+    printf("received raw: %s", recv_buffer);
     recv_header = (struct iphdr *) recv_buffer;
     recv_data_ptr = (recv_buffer + recv_header->ihl * sizeof(char));
 
     received_ip_checksum = recv_header->check;
-    calculated_ip_checksum = ip_sum((char *) recv_header, recv_header->ihl * sizeof(char));
+    calculated_ip_checksum = ip_sum((char *) recv_header, recv_header->ihl * 4);
 
     if(received_ip_checksum != calculated_ip_checksum){ 
         printf("Broken checksum, dropping packet\n");
-        return;
+ //       return;
     }
 
     memset(&recv_data_buffer[0], 0, (MAX_RECV_SIZE * sizeof(char)));
