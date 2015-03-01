@@ -57,27 +57,7 @@ ifconfig_table_t IFCONFIG_TABLE;
 
 
 void build_tables() {
-
-    char ch[2000], file_name[25];
-    FILE *fp;
-    printf("Enter file name you wish to upload\n");
-    gets(file_name);
-    //printf("%s\n", file_name);
-
-    fp = fopen(file_name,"r");
-
-    if( fp == NULL ) {
-      perror("Error while opening the file.\n");
-      exit(EXIT_FAILURE);
-    }
-
-    printf("The contents of %s file are :\n", file_name);
- 
-   //while( ( ch = fgetc(fp) ) != EOF )
-    while (fgets(ch,2000,fp)!=NULL)
-      printf("%s",ch);
- 
-   fclose(fp);
+    
 }
 
 void send_packet(uint32_t destination, char * msg) {
@@ -197,6 +177,11 @@ int init_listen_socket(int port, fd_set * running_fd_set){
 int main(int argc, char ** argv) {
     // Initialize based on input file
     
+    char ch, file_name[25];
+    FILE *fp;
+    printf("Enter file name you wish to upload\n");
+    gets(file_name);
+    printf("%s\n", file_name);
     build_tables();
 
     // initialize routing information
@@ -212,16 +197,15 @@ int main(int argc, char ** argv) {
 
     listen_socket = init_listen_socket(7000, running_ptr);
 
-    char command_line[100];
+    char command_line[50];
 
-    //Interface * thingy = new Interface(1, "127.0.0.1", 7000, "127.0.0.1", 7001, "192.168.0.1", "192.168.0.2");
+    Interface * thingy = new Interface(1, "127.0.0.1", 7000, "127.0.0.1", 7001, "192.168.0.1", "192.168.0.2");
 
     while (1) {
     	// check for user input
     		// handle
     	// check for recieved packet
     		// handle
-        printf("Enter a command.");
 
         read_set = running_set;
 
