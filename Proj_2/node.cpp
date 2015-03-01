@@ -31,7 +31,7 @@ typedef struct interface {
 } interface_t;
 
 typedef struct forwarding_entry {
-    uint32_t dest_addr;
+    char dest_addr[IP_ADDR_LEN];
     int interface_id;
     int cost;
 } forwarding_entry_t;
@@ -78,16 +78,16 @@ void initialize_interface(interface_t * interface) {
     }
 }
 
-void send_packet_with_interface(interface_t interface, char * data, struct iphdr * ip_header) {
-    if (!interface.is_up) return;
+void send_packet_with_interface(interface_t * interface, char * data, struct iphdr * ip_header) {
+    if (!interface->is_up) return;
 
     struct sockaddr_in dest_addr;
 
-    dest_addr.sin_addr.s_addr = inet_addr(interface.other_ip);
+    dest_addr.sin_addr.s_addr = inet_addr(interface->other_ip);
     dest_addr.sin_family = AF_INET;
-    dest_addr.sin_port = htons(interface.other_port);
+    dest_addr.sin_port = htons(interface->other_port);
 
-    if (sendto(interface.send_socket, data, ip_header->tot_len, 0, (struct sockaddr*) &dest_addr, sizeof(dest_addr)) < 0) {
+    if (sendto(interface->send_socket, data, ip_header->tot_len, 0, (struct sockaddr*) &dest_addr, sizeof(dest_addr)) < 0) {
         perror("Failed to send packet");
     }
 }
@@ -210,11 +210,20 @@ void send_packet(char * dest_addr, char * msg, int msg_size, int TTL, int protoc
         return;
     }
 
-    //memset?
+    char packet[MAX_MTU_SIZE];
+    memset(&packet[0], 0, sizeof(packet));
 
-    
+    struct iphdr * ip_header = (struct iphdr*) packet;
 
-    // send message
+    ip_header -> id = rand();
+    ip_header -> saddr = inet_addr(interface -> my_vip);
+    ip_header -> daddr = inet_addr(f_entry -> dest_addr);
+    ip_header -> version = 4;
+    ip_header -> ttl = TTL;
+    ip_header -> protocol = protocol;
+
+    send_packet_with_interface(interface, msg, ip_header);
+
     return;
 }
 
@@ -249,7 +258,7 @@ void print_routes() {
     int i;
     for (i = 0; i < FORWARDING_TABLE.num_entries; ++i) {
         forwarding_entry_t entry = FORWARDING_TABLE.forwarding_entries[i];
-        printf("%d %d %d\n", entry.dest_addr, entry.cost, entry.interface_id);
+        printf("%s %d %d\n", entry.dest_addr, entry.cost, entry.interface_id);
     }
     printf("....end finding routes.\n");
 }
