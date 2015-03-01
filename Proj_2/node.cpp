@@ -70,8 +70,8 @@ forwarding_table_t FORWARDING_TABLE;
 ifconfig_table_t IFCONFIG_TABLE;
 metadata_t SELF;
 
-void initialize_interface(interface_t interface) {
-    if ( (interface.send_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+void initialize_interface(interface_t * interface) {
+    if ( (interface->send_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         perror("Failed to start send socket");
         exit(1);
     }
@@ -92,17 +92,18 @@ void send_packet_with_interface(interface_t interface, char * data, struct iphdr
 }
 
 void create_ifconfig_entry(int ID, uint16_t port, char *myIP, char *myVIP, char *otherVIP) {
-    interface_t entry;
-    entry.interface_id = ID;
-    entry.my_port = port;
-    strcpy(entry.my_ip,myIP);
-    strcpy(entry.my_vip,myVIP);
-    strcpy(entry.other_vip,otherVIP);
-    entry.is_up = true;
-    entry.mtu_size = MAX_MTU_SIZE;
+    interface_t * entry;
+    entry->interface_id = ID;
+    entry->my_port = port;
+    strcpy(entry->my_ip,myIP);
+    strcpy(entry->my_vip,myVIP);
+    strcpy(entry->other_vip,otherVIP);
+    entry->is_up = true;
+    entry->mtu_size = MAX_MTU_SIZE;
 
-    IFCONFIG_TABLE.ifconfig_entries[ID] = entry;
-    IFCONFIG_TABLE.num_entries++;    
+    IFCONFIG_TABLE.ifconfig_entries[ID] = *entry;
+    IFCONFIG_TABLE.num_entries++;
+    initialize_interface(entry);
 }
 
 void build_forwarding_table(FILE *fp) {
@@ -309,9 +310,6 @@ int main(int argc, char ** argv) {
     listen_socket = init_listen_socket(7000, running_ptr);
 
     char command_line[100];
-    
-    interface_t anInterface;
-    initialize_interface(anInterface);
 
     while (1) {
     	// check for user input
