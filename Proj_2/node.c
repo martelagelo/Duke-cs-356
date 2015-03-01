@@ -76,7 +76,7 @@ void set_as_up(int ID) {
 }
 
 void set_as_down(int ID) {
-
+    
 }
 
 void print_routes() {
@@ -189,6 +189,10 @@ int main(int argc, char ** argv) {
             scanf("%s", command_line);
             //printf( "\n%s", commandLine);
             choose_command(command_line);
+        }
+
+        if (FD_ISSET (listen_socket, &read_set)){ // data ready on the read socket
+            //handle_packet(listen_socket);
         }
     }
 }

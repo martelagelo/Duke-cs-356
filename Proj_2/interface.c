@@ -25,21 +25,20 @@ public:
 
     Interface(int, char [], int, char [], int, char [], char []);
     void send_packet(char *, struct iphdr *);
-
 };
 
-Interface::Interface (int a, char b[], int c, char d[], int e, char f[], char g[]) {
-    id = a;
-    strcpy(b, my_ip);
-    //my_ip = b;
-    my_port = c;
-    strcpy(d, other_ip);
-    //other_ip = d;
-    other_port = e;
-    strcpy(f, my_vip);
-    strcpy(g, other_vip);
-    //my_vip = f;
-    //other_vip = g;
+Interface::Interface (int id_in, char my_ip_in[], int my_port_in, char other_ip_in[], int other_port_in, char my_vip_in[], char other_vip_in[]) {
+    id = id_in;
+    strcpy(my_ip_in, my_ip);
+    //my_ip = my_ip_in;
+    my_port = my_port_in;
+    strcpy(other_ip_in, other_ip);
+    //other_ip = other_ip_in;
+    other_port = other_port_in;
+    strcpy(my_vip_in, my_vip);
+    strcpy(other_vip_in, other_vip);
+    //my_vip = my_vip_in;
+    //other_vip = other_vip_in;
 
     is_up = true;
     mtu_size = 1400;
@@ -51,6 +50,8 @@ Interface::Interface (int a, char b[], int c, char d[], int e, char f[], char g[
 }
 
 void Interface::send_packet(char * data, struct iphdr * ip_header) {
+    if (!is_up) return;
+
 	struct sockaddr_in dest_addr;
 
     dest_addr.sin_addr.s_addr = inet_addr(other_ip);
