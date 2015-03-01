@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <fcntl.h>
-#include <iostream>
 //#include "interface.h"
 using namespace std;
 
@@ -19,12 +18,12 @@ using namespace std;
 
 typedef struct interface {
     int interface_id;
-    char my_ip[MAX_IP_LEN];
+    char my_ip[IP_ADDR_LEN];
     uint16_t my_port;
-    char other_ip[MAX_IP_LEN];
+    char other_ip[IP_ADDR_LEN];
     uint16_t other_port;
-    char my_vip[MAX_IP_LEN];
-    char other_vip[MAX_IP_LEN];
+    char my_vip[IP_ADDR_LEN];
+    char other_vip[IP_ADDR_LEN];
     int mtu_size;
     bool is_up;
     int send_socket;
@@ -69,6 +68,7 @@ typedef struct metadata {
 
 forwarding_table_t FORWARDING_TABLE;
 ifconfig_table_t IFCONFIG_TABLE;
+metadata_t SELF;
 
 void initialize_interface(interface_t interface) {
     if ( (interface.send_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
@@ -154,8 +154,30 @@ void build_tables() {
    fclose(fp);
 }
 
+interface_t* get_interface_by_id(int id) {
+    interface_t * temp = IFCONFIG_TABLE.ifconfig_entries;
+    int i;
+    for(i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
+        if(IFCONFIG_TABLE.ifconfig_entries[i].interface_id == id) {
+            return (temp + i);
+        }
+    }
+    return NULL;
+}
+
+interface_t* get_interface_by_dest_addr(char * dest_addr) {
+    interface_t * temp = IFCONFIG_TABLE.ifconfig_entries;
+    int i;
+    for(i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
+        if(strcmp(IFCONFIG_TABLE.ifconfig_entries[i].other_vip, dest_addr) == 0) {
+            return (temp + i);
+        }
+    }
+    return NULL;
+}
+
 void send_packet(char * dest_addr, char * msg) {
-    interface_t interface = get_interface_by_dest_addr(dest_addr);
+    interface_t * interface = get_interface_by_dest_addr(dest_addr);
     if (interface == NULL) {
         printf("Path does not exist.\n");
         return;
@@ -169,45 +191,25 @@ void forward_packet() {
 }
 
 void set_as_up(int ID) {
-    interface_t interface = get_interface_by_id(ID);
-    if (interface == NULL) {}
+    interface_t * interface = get_interface_by_id(ID);
+    if (interface == NULL) {
         printf("Interface %d is not found.\n", ID);
         return;
     }
-    interface.is_up = true;
+    interface->is_up = true;
     printf("Interface %d is up.\n", ID);
     return;
 }
 
 void set_as_down(int ID) {
-    interface_t interface = get_interface_by_id(ID);
-    if (interface == NULL) {}
+    interface_t * interface = get_interface_by_id(ID);
+    if (interface == NULL) {
         printf("Interface %d is not found.\n", ID);
         return;
     }
-    interface.is_up = false;
+    interface->is_up = false;
     printf("Interface %d is down.\n", ID);
     return;
-}
-
-interface_t get_interface_by_id(int id) {
-    int i;
-    for(i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
-        if(IFCONFIG_TABLE.ifconfig_entries[i].interface_id == id) {
-            return IFCONFIG_TABLE.ifconfig_entries[i];
-        }
-    }
-    return NULL;
-}
-
-interface_t get_interface_by_dest_addr(char * dest_addr) {
-    int i;
-    for(i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
-        if(strcmp(IFCONFIG_TABLE.ifconfig_entries[i].interface_vip, interface_vip) == 0) {
-            return IFCONFIG_TABLE.ifconfig_entries[i];
-        }
-    }
-    return NULL;
 }
 
 void print_routes() {
