@@ -15,6 +15,7 @@ using namespace std;
 #define MAX_MTU_SIZE 1400
 #define LOCALHOST "127.0.0.1"
 #define IP_ADDR_LEN 16
+#define MAX_COST 16
 
 typedef struct interface {
     int interface_id;
@@ -91,6 +92,9 @@ void send_packet_with_interface(interface_t interface, char * data, struct iphdr
     }
 }
 
+/**
+* Creates and addes a ifconfig entry to the ifconfig table
+**/
 void create_ifconfig_entry(int ID, uint16_t port, char *myIP, char *myVIP, char *otherVIP) {
     interface_t * entry;
     entry->interface_id = ID;
@@ -106,6 +110,9 @@ void create_ifconfig_entry(int ID, uint16_t port, char *myIP, char *myVIP, char 
     initialize_interface(entry);
 }
 
+/**
+* Fills and IFCONFIG_TABLE and the FORWARDING_TABLE
+**/
 void fill_tables(FILE *fp) {
     int ID;
     char other_port[IP_ADDR_LEN], other_vip[IP_ADDR_LEN], my_vip[IP_ADDR_LEN], myIP[IP_ADDR_LEN];
@@ -128,13 +135,14 @@ void fill_tables(FILE *fp) {
     }
 }
 
+/**
+* Fills tables and global variables with information from the loaded file
+**/
 void load_from_file() {
-
     char content[2000], file_name[25];
     FILE *fp;
     printf("Enter file name you wish to upload\n");
     gets(file_name);
-    //printf("%s\n", file_name);
 
     fp = fopen(file_name,"r");
 
@@ -143,16 +151,14 @@ void load_from_file() {
       exit(EXIT_FAILURE);
     }
 
-    printf("The contents of %s file are :\n", file_name);
-
+    printf("The contents of %s first line are: ", file_name);
     fscanf(fp, "%s", content);
     printf("%s\n", content);
 
     strcpy(SELF.my_ip,strtok (content,":"));
     SELF.port = atoi(strtok (NULL,": "));
 
-    printf("myIP: %s\nmyPort: %d\n", SELF.my_ip, (int) SELF.port);
-
+    //printf("myIP: %s\nmyPort: %d\n", SELF.my_ip, (int) SELF.port);
     fill_tables(fp);
     
    fclose(fp);
@@ -180,12 +186,34 @@ interface_t* get_interface_by_dest_addr(char * dest_addr) {
     return NULL;
 }
 
-void send_packet(char * dest_addr, char * msg) {
+forwarding_entry_t* get_forwarding_entry_by_id(int id) {
+    forwarding_entry_t * temp = FORWARDING_TABLE.forwarding_entries;
+    int i;
+    for(i = 0; i< FORWARDING_TABLE.num_entries; i++) {
+        if(FORWARDING_TABLE.forwarding_entries[i].interface_id == id) {
+            return (temp + i);
+        }
+    }
+    return NULL;
+}
+
+void send_packet(char * dest_addr, char * msg, int msg_size, int TTL, int protocol) {
     interface_t * interface = get_interface_by_dest_addr(dest_addr);
     if (interface == NULL) {
         printf("Path does not exist.\n");
         return;
     }
+
+    forwarding_entry_t * f_entry = get_forwarding_entry_by_id(interface->interface_id);
+    if (f_entry == NULL) {
+        printf("Path does not exist in forwarding table.");
+        return;
+    }
+
+    //memset?
+
+    
+
     // send message
     return;
 }
