@@ -87,7 +87,7 @@ void send_packet_with_interface(interface_t interface, char * data, struct iphdr
 
 void build_tables() {
 
-    char ch[2000], file_name[25];
+    char content[2000], file_name[25];
     FILE *fp;
     printf("Enter file name you wish to upload\n");
     gets(file_name);
@@ -101,11 +101,18 @@ void build_tables() {
     }
 
     printf("The contents of %s file are :\n", file_name);
- 
-   //while( ( ch = fgetc(fp) ) != EOF )
-    while (fgets(ch,2000,fp)!=NULL)
-      printf("%s",ch);
- 
+
+    fscanf(fp, "%s", content);
+    printf("%s\n", content);
+
+    char *myIP;
+    uint32_t myPort;
+
+    myIP = strtok (content,":");
+    printf("%s\n", myIP);
+    myPort = atoi(strtok (NULL,": "));
+    printf("myIP: %s\nmyPort: %d\n", myIP, (int) myPort);
+    
    fclose(fp);
 }
 
