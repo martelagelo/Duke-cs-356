@@ -129,9 +129,7 @@ void fill_tables(FILE *fp) {
             strcpy(myIP, LOCALHOST);
         } 
         port = atoi(strtok (NULL,": "));
-
         create_ifconfig_entry(ID, port, myIP, my_vip, other_vip);
-
         //update forwarding_table
         ID++;
     }
