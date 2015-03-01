@@ -13,15 +13,16 @@
 using namespace std;
 
 #define MAX_NUM_ROUTING_ENTRIES 64
+#define IP_ADDR_LEN 16
 
 typedef struct interface {
     int interface_id;
-    char my_ip[16];
+    char my_ip[MAX_IP_LEN];
     uint16_t my_port;
-    char other_ip[16];
+    char other_ip[MAX_IP_LEN];
     uint16_t other_port;
-    char my_vip[16];
-    char other_vip[16];
+    char my_vip[MAX_IP_LEN];
+    char other_vip[MAX_IP_LEN];
     int mtu_size;
     bool is_up;
     int send_socket;
@@ -31,7 +32,6 @@ typedef struct forwarding_entry {
     uint32_t dest_addr;
     int interface_id;
     int cost;
-    char *state;
 } forwarding_entry_t;
 
 typedef struct forwarding_table {
@@ -54,10 +54,6 @@ typedef struct rip_packet {
     } entries[MAX_NUM_ROUTING_ENTRIES];
 } rip_packet_t;
 
-typedef struct metadata {
-    uint32_t port;
-} metadata_t;
-
 /* Notes:
     rip algorithm cases: http://en.wikipedia.org/wiki/Routing_Information_Protocol
     for listening on multiple fd/sockets's simultaneously use fd_set and select() 
@@ -66,8 +62,6 @@ typedef struct metadata {
 
 forwarding_table_t FORWARDING_TABLE;
 ifconfig_table_t IFCONFIG_TABLE;
-metadata_t SELF;
-
 
 void initialize_interface(interface_t interface) {
     if ( (interface.send_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
@@ -108,36 +102,25 @@ void build_tables() {
     printf("The contents of %s file are :\n", file_name);
 
     fscanf(fp, "%s", content);
+    printf("%s\n", content);
 
     char *myIP;
+    uint32_t myPort;
+
     myIP = strtok (content,":");
-    SELF.port = atoi(strtok (NULL,": "));
-
-    printf("myIP: %s\nmyPort: %d\n", myIP, (int) SELF.port);
-
-    build_forwarding_table(fp);
-
+    printf("%s\n", myIP);
+    myPort = atoi(strtok (NULL,": "));
+    printf("myIP: %s\nmyPort: %d\n", myIP, (int) myPort);
+    
    fclose(fp);
 }
 
-void build_forwarding_table(FILE *fp) {
-    int ID;
-    char other_port[20], other_ip[20], my_ip[20];
-
-
-    ID = 0;
-    while(feof(fp) == false) {
-        //ifconfig_entry_t
-        //FORWARDING_TABLE[i].
+void send_packet(char * dest_addr, char * msg) {
+    interface_t interface = get_interface_by_dest_addr(dest_addr);
+    if (interface == NULL) {
+        printf("")
+        return;
     }
-}
-
-void create_ifconfig_entry(int ID) {
-    ifconfig_entry_t entry;
-    entry.interface_id = ID;    
-}
-
-void send_packet(uint32_t destination, char * msg) {
     int i;
     for(i = 0; i < FORWARDING_TABLE.num_entries; i++) {
         if(FORWARDING_TABLE.forwarding_entries[i].dest_addr == destination) {
@@ -153,29 +136,45 @@ void forward_packet() {
 }
 
 void set_as_up(int ID) {
-    int i;
-    for(i = 0; i < IFCONFIG_TABLE.num_entries; i++) {
-        if(IFCONFIG_TABLE.ifconfig_entries[i].interface_id == ID) {
-            IFCONFIG_TABLE.ifconfig_entries[i].is_up = true;
-            printf("Interface %d is up.\n", ID);
-            return;
-        }
+    interface_t interface = get_interface_by_id(ID);
+    if (interface == NULL) {}
+        printf("Interface %d is not found.\n", ID);
+        return;
     }
-    //Needs to also update forwarding table and network table
-    printf("Interface %d is not found.\n", ID);
+    interface.is_up = true;
+    printf("Interface %d is up.\n", ID);
+    return;
 }
 
 void set_as_down(int ID) {
+    interface_t interface = get_interface_by_id(ID);
+    if (interface == NULL) {}
+        printf("Interface %d is not found.\n", ID);
+        return;
+    }
+    interface.is_up = false;
+    printf("Interface %d is down.\n", ID);
+    return;
+}
+
+interface_t get_interface_by_id(int id) {
     int i;
     for(i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
-        if(IFCONFIG_TABLE.ifconfig_entries[i].interface_id == ID) {
-            IFCONFIG_TABLE.ifconfig_entries[i].is_up = false;
-            printf("Interface %d is down.\n", ID);
-            return;
+        if(IFCONFIG_TABLE.ifconfig_entries[i].interface_id == id) {
+            return IFCONFIG_TABLE.ifconfig_entries[i];
         }
     }
-    //Needs to also update forwarding table and network table
-    printf("Interface %d is not found.\n", ID);
+    return NULL;
+}
+
+interface_t get_interface_by_dest_addr(char * dest_addr) {
+    int i;
+    for(i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
+        if(strcmp(IFCONFIG_TABLE.ifconfig_entries[i].interface_vip, interface_vip) == 0) {
+            return IFCONFIG_TABLE.ifconfig_entries[i];
+        }
+    }
+    return NULL;
 }
 
 void print_routes() {
