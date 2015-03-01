@@ -15,7 +15,7 @@ using namespace std;
 #define MAX_NUM_ROUTING_ENTRIES 64
 
 typedef struct interface {
-    int id;
+    int interface_id;
     char my_ip[16];
     uint16_t my_port;
     char other_ip[16];
@@ -40,15 +40,9 @@ typedef struct forwarding_table {
     forwarding_entry_t forwarding_entries[MAX_NUM_ROUTING_ENTRIES];
 } forwarding_table_t;
 
-typedef struct ifconfig_entry {
-    int interface_id;
-    char *state;
-    uint32_t source_addr;
-} ifconfig_entry_t;
-
 typedef struct ifconfig_table {
     int num_entries;
-    ifconfig_entry_t ifconfig_entries[MAX_NUM_ROUTING_ENTRIES];
+    interface_t ifconfig_entries[MAX_NUM_ROUTING_ENTRIES];
 } ifconfig_table_t;
 
 typedef struct rip_packet {
@@ -163,7 +157,7 @@ void set_as_up(int ID) {
     int i;
     for(i = 0; i < IFCONFIG_TABLE.num_entries; i++) {
         if(IFCONFIG_TABLE.ifconfig_entries[i].interface_id == ID) {
-            IFCONFIG_TABLE.ifconfig_entries[i].state == "up";
+            IFCONFIG_TABLE.ifconfig_entries[i].is_up = true;
             printf("Interface %d is up.\n", ID);
             return;
         }
@@ -176,7 +170,7 @@ void set_as_down(int ID) {
     int i;
     for(i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
         if(IFCONFIG_TABLE.ifconfig_entries[i].interface_id == ID) {
-            IFCONFIG_TABLE.ifconfig_entries[i].state == "down";
+            IFCONFIG_TABLE.ifconfig_entries[i].is_up = false;
             printf("Interface %d is down.\n", ID);
             return;
         }
@@ -199,8 +193,8 @@ void print_ifconfig() {
     printf("Start ifconfig....\n");
     int i;
     for (i = 0; i < IFCONFIG_TABLE.num_entries ; ++i) {
-        ifconfig_entry_t entry = IFCONFIG_TABLE.ifconfig_entries[i];
-        printf("%d %d %s\n", entry.interface_id, entry.source_addr, entry.state);
+        interface_t entry = IFCONFIG_TABLE.ifconfig_entries[i];
+        printf("%d %s %s\n", entry.interface_id, entry.my_vip, entry.is_up ? "up" : "down");
     }
     printf("....end ifconfig.\n");
 }
@@ -214,17 +208,17 @@ void choose_command(char * command) {
     }
     else if (strcmp("up", command) == 0) {
         //do this other thing
-//        set_as_up();
+        //set_as_up();
 
     }
     else if (strcmp("down", command) == 0) {
         //do this other thing
-//        set_as_down();
+        //set_as_down();
     }
     else if (strcmp("send", command) == 0) { 
         //send
         printf("send\n");
-//        send_packet();
+        //send_packet();
     }
     else if (strcmp("die", command) == 0) { 
         //send
