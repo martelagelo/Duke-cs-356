@@ -220,7 +220,7 @@ forwarding_entry_t* get_forwarding_entry_by_dest_addr(char * dest_addr) {
 }
 
 void send_packet(char * dest_addr, char * msg, int msg_size, int TTL, int protocol) {
-    
+
     forwarding_entry_t *f_entry = get_forwarding_entry_by_dest_addr(dest_addr);
     if (f_entry == NULL) {
         printf("Path does not exist in forwarding table.");
@@ -312,7 +312,7 @@ void choose_command(char * command) {
         set_as_down(ID);
     }
     else if (strcmp("send", command) == 0) { 
-        char *msg, *dest_addr;
+        char dest_addr[20], msg[MAX_MTU_SIZE];
         scanf("%s %[^\n]s", dest_addr, msg);
         printf("destination: %s     message: %s", dest_addr, msg);
         send_packet(dest_addr, msg, strlen(msg), MAX_TTL, TEST_PROTOCOL_VAL);
