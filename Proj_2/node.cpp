@@ -110,7 +110,7 @@ void create_ifconfig_entry(int ID, uint16_t port, char *myIP, char *myVIP, char 
     initialize_interface(entry);
 }
 
-void build_forwarding_table(FILE *fp) {
+void build_tables(FILE *fp) {
     int ID;
     char other_port[IP_ADDR_LEN], other_vip[IP_ADDR_LEN], my_vip[IP_ADDR_LEN], myIP[IP_ADDR_LEN];
     uint16_t port;
@@ -125,14 +125,14 @@ void build_forwarding_table(FILE *fp) {
         } 
         port = atoi(strtok (NULL,": "));
         create_ifconfig_entry(ID, port, myIP, my_vip, other_vip);
-        
+
         //update forwarding_table
         ID++;
 
     }
 }
 
-void build_tables() {
+void load_from_file() {
 
     char content[2000], file_name[25];
     FILE *fp;
@@ -157,7 +157,7 @@ void build_tables() {
 
     printf("myIP: %s\nmyPort: %d\n", SELF.my_ip, (int) SELF.port);
 
-    build_forwarding_table(fp);
+    build_tables(fp);
     
    fclose(fp);
 }
@@ -184,7 +184,18 @@ interface_t* get_interface_by_dest_addr(char * dest_addr) {
     return NULL;
 }
 
-void send_packet(char * dest_addr, char * msg) {
+forwarding_entry_t* get_forwarding_entry_by_id(int id) {
+    forwarding_entry_t * temp = FORWARDING_TABLE.forwarding_entries;
+    int i;
+    for(i = 0; i< FORWARDING_TABLE.num_entries; i++) {
+        if(FORWARDING_TABLE.forwarding_entries[i].interface_id == id) {
+            return (temp + i);
+        }
+    }
+    return NULL;
+}
+
+void send_packet(char * dest_addr, char * msg, int TTL, int protocol) {
     interface_t * interface = get_interface_by_dest_addr(dest_addr);
     if (interface == NULL) {
         printf("Path does not exist.\n");
@@ -220,22 +231,22 @@ void forward_packet() {
 void set_as_up(int ID) {
     interface_t * interface = get_interface_by_id(ID);
     if (interface == NULL) {
-        printf("Interface %d is not found.\n", ID);
+        printf("\nInterface %d is not found.\n\n", ID);
         return;
     }
     interface->is_up = true;
-    printf("Interface %d is up.\n", ID);
+    printf("\nInterface %d is up.\n\n", ID);
     return;
 }
 
 void set_as_down(int ID) {
     interface_t * interface = get_interface_by_id(ID);
     if (interface == NULL) {
-        printf("Interface %d is not found.\n", ID);
+        printf("\nInterface %d is not found.\n\n", ID);
         return;
     }
     interface->is_up = false;
-    printf("Interface %d is down.\n", ID);
+    printf("\nInterface %d is down.\n\n", ID);
     return;
 }
 
@@ -250,16 +261,17 @@ void print_routes() {
 }
 
 void print_ifconfig() {
-    printf("Start ifconfig....\n");
+    printf("\nStart ifconfig....\n");
     int i;
     for (i = 0; i < IFCONFIG_TABLE.num_entries ; ++i) {
         interface_t entry = IFCONFIG_TABLE.ifconfig_entries[i];
         printf("%d %s %s\n", entry.interface_id, entry.my_vip, entry.is_up ? "up" : "down");
     }
-    printf("....end ifconfig.\n");
+    printf("....end ifconfig.\n\n");
 }
 
 void choose_command(char * command) {
+    int ID;
     if(strcmp("ifconfig", command) == 0) {
         print_ifconfig();
     }
@@ -267,21 +279,20 @@ void choose_command(char * command) {
         print_routes();
     }
     else if (strcmp("up", command) == 0) {
-        //do this other thing
-        //set_as_up();
-
+        scanf("%d", &ID);
+        set_as_up(ID);
     }
     else if (strcmp("down", command) == 0) {
-        //do this other thing
-        //set_as_down();
+        scanf("%d", &ID);
+        set_as_down(ID);
     }
     else if (strcmp("send", command) == 0) { 
-        //send
-        printf("send\n");
+        char *msg, *dest_addr;
+        scanf("%s %[^\n]s", dest_addr, msg);
+        printf("destination: %s     message: %s", dest_addr, msg);
         //send_packet();
     }
     else if (strcmp("die", command) == 0) { 
-        //send
         printf("....*BANG*-*clatter*-*thud*.......\n");
         exit(0);
     }
@@ -353,7 +364,7 @@ void handle_packet(int listen_socket) {
 int main(int argc, char ** argv) {
     // Initialize based on input file
     
-    build_tables();
+    load_from_file();
     // initialize routing information
     int listen_socket;
     fd_set full_fd_set, need_to_read_set;
