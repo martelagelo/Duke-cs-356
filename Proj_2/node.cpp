@@ -96,7 +96,7 @@ void send_packet_with_interface(interface_t * interface, char * data, struct iph
 }
 
 void create_ifconfig_entry(int ID, uint16_t port, char *myIP, char *myVIP, char *otherVIP) {
-    interface_t * entry;
+    interface_t entry;
     entry->interface_id = ID;
     entry->my_port = port;
     strcpy(entry->my_ip,myIP);
@@ -335,6 +335,8 @@ void handle_packet(int listen_socket) {
     char recv_data_buffer[MAX_RECV_SIZE];
     int received_ip_checksum, calculated_ip_checksum;
 
+    memset(&recv_buffer[0], 0, (MAX_RECV_SIZE * sizeof(char)));
+
     recv(listen_socket, recv_buffer, MAX_RECV_SIZE, 0);
 
     recv_header = (struct iphdr *) recv_buffer;
@@ -348,7 +350,10 @@ void handle_packet(int listen_socket) {
         return;
     }
 
+    memset(&recv_data_buffer[0], 0, (MAX_RECV_SIZE * sizeof(char)));
     memcpy(recv_data_buffer, recv_data_ptr, MAX_RECV_SIZE);
+
+
 
     if(recv_header->protocol == TEST_PROTOCOL_VAL){
         //if(isMe(dest_addr) < 0){ // not in the table, need to forward
@@ -358,6 +363,8 @@ void handle_packet(int listen_socket) {
         //else{
             printf("message: %s\n", recv_data_buffer);
         //}
+    } else {
+        printf("Got something other than test protocol: %s\n", recv_data_buffer);
     }
 }
 
