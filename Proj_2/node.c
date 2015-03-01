@@ -56,7 +56,7 @@ forwarding_table_t FORWARDING_TABLE;
 ifconfig_table_t IFCONFIG_TABLE;
 
 
-void build_forwarding_table() {
+void build_tables() {
     
 }
 
@@ -177,7 +177,12 @@ int init_listen_socket(int port, fd_set * running_fd_set){
 int main(int argc, char ** argv) {
     // Initialize based on input file
     
-
+    char ch, file_name[25];
+    FILE *fp;
+    printf("Enter file name you wish to upload\n");
+    gets(file_name);
+    printf("%s\n", file_name);
+    build_tables();
 
     // initialize routing information
     int listen_socket;
