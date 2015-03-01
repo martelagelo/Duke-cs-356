@@ -29,7 +29,6 @@ typedef struct interface {
 
 typedef struct forwarding_entry {
     uint32_t dest_addr;
-    uint32_t next_hop;
     int interface_id;
     int cost;
     char *state;
