@@ -3,29 +3,14 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
-#include <netinet/ip.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <fcntl.h>
-#include <iostream>
-//#include "interface.h"
-using namespace std;
+#include "interface.h"
+
 
 #define MAX_NUM_ROUTING_ENTRIES 64
-
-typedef struct interface {
-    int id;
-    char my_ip[16];
-    uint16_t my_port;
-    char other_ip[16];
-    uint16_t other_port;
-    char my_vip[16];
-    char other_vip[16];
-    int mtu_size;
-    bool is_up;
-    int send_socket;
-} interface_t;
 
 typedef struct forwarding_entry {
     uint32_t dest_addr;
@@ -52,13 +37,13 @@ typedef struct ifconfig_table {
 } ifconfig_table_t;
 
 typedef struct rip_packet {
-    uint16_t command;
-    uint16_t num_entries;
+	uint16_t command;
+	uint16_t num_entries;
 
-    struct {
-        uint32_t cost;
-        uint32_t address;
-    } entries[MAX_NUM_ROUTING_ENTRIES];
+	struct {
+		uint32_t cost;
+		uint32_t address;
+	} entries[MAX_NUM_ROUTING_ENTRIES];
 } rip_packet_t;
 
 /* Notes:
@@ -70,49 +55,9 @@ typedef struct rip_packet {
 forwarding_table_t FORWARDING_TABLE;
 ifconfig_table_t IFCONFIG_TABLE;
 
-void initialize_interface(interface_t interface) {
-    if ( (interface.send_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-        perror("Failed to start send socket");
-        exit(1);
-    }
-}
-
-void send_packet_with_interface(interface_t interface, char * data, struct iphdr * ip_header) {
-    if (!interface.is_up) return;
-
-    struct sockaddr_in dest_addr;
-
-    dest_addr.sin_addr.s_addr = inet_addr(interface.other_ip);
-    dest_addr.sin_family = AF_INET;
-    dest_addr.sin_port = htons(interface.other_port);
-
-    if (sendto(interface.send_socket, data, ip_header->tot_len, 0, (struct sockaddr*) &dest_addr, sizeof(dest_addr)) < 0) {
-        perror("Failed to send packet");
-    }
-}
 
 void build_tables() {
-
-    char ch[2000], file_name[25];
-    FILE *fp;
-    printf("Enter file name you wish to upload\n");
-    gets(file_name);
-    //printf("%s\n", file_name);
-
-    fp = fopen(file_name,"r");
-
-    if( fp == NULL ) {
-      perror("Error while opening the file.\n");
-      exit(EXIT_FAILURE);
-    }
-
-    printf("The contents of %s file are :\n", file_name);
- 
-   //while( ( ch = fgetc(fp) ) != EOF )
-    while (fgets(ch,2000,fp)!=NULL)
-      printf("%s",ch);
- 
-   fclose(fp);
+    
 }
 
 void send_packet(uint32_t destination, char * msg) {
@@ -197,11 +142,6 @@ void choose_command(char * command) {
         printf("send\n");
 //        send_packet();
     }
-    else if (strcmp("die", command) == 0) { 
-        //send
-        printf("....*BANG*-*clatter*-*thud*.......\n");
-        exit(0);
-    }
     else {
         printf("\nCommand not found. Please enter a different command.\n");
     }
@@ -237,47 +177,50 @@ int init_listen_socket(int port, fd_set * running_fd_set){
 int main(int argc, char ** argv) {
     // Initialize based on input file
     
+    char ch, file_name[25];
+    FILE *fp;
+    printf("Enter file name you wish to upload\n");
+    gets(file_name);
+    printf("%s\n", file_name);
     build_tables();
 
     // initialize routing information
     int listen_socket;
-    fd_set full_fd_set, need_to_read_set;
+    fd_set running_set, read_set;
     fd_set *running_ptr;
 
-    running_ptr = & full_fd_set;
+    running_ptr = & running_set;
 
 
-    FD_ZERO (&full_fd_set);
-    FD_SET (1, &full_fd_set);
+    FD_ZERO (&running_set);
+    FD_SET (1, &running_set);
 
     listen_socket = init_listen_socket(7000, running_ptr);
 
-    char command_line[100];
-    
-    interface_t anInterface;
-    initialize_interface(anInterface);
+    char command_line[50];
+
+    Interface * thingy = new Interface(1, "127.0.0.1", 7000, "127.0.0.1", 7001, "192.168.0.1", "192.168.0.2");
 
     while (1) {
     	// check for user input
     		// handle
     	// check for recieved packet
     		// handle
-        printf("Enter a command.");
 
-        need_to_read_set = full_fd_set;
+        read_set = running_set;
 
-        if (select (FD_SETSIZE, &need_to_read_set, NULL, NULL, NULL) < 0){ 
+        if (select (FD_SETSIZE, &read_set, NULL, NULL, NULL) < 0){ 
             perror ("Select error: ");
             exit (EXIT_FAILURE);
         }
 
-        if (FD_ISSET(1, &need_to_read_set)) {
+        if (FD_ISSET(1, &read_set)) {
             scanf("%s", command_line);
             //printf( "\n%s", commandLine);
             choose_command(command_line);
         }
 
-        if (FD_ISSET (listen_socket, &need_to_read_set)){ // data ready on the read socket
+        if (FD_ISSET (listen_socket, &read_set)){ // data ready on the read socket
             //handle_packet(listen_socket);
         }
     }
