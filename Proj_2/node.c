@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <fcntl.h>
+#include "interface.h"
+
 
 #define MAX_NUM_ROUTING_ENTRIES 64
 
@@ -128,17 +130,17 @@ void choose_command(char * command) {
     }
     else if (strcmp("up", command) == 0) {
         //do this other thing
-        set_as_up();
+//        set_as_up();
 
     }
     else if (strcmp("down", command) == 0) {
         //do this other thing
-        set_as_down();
+//        set_as_down();
     }
     else if (strcmp("send", command) == 0) { 
         //send
         printf("send\n");
-        send_packet();
+//        send_packet();
     }
     else {
         printf("\nCommand not found. Please enter a different command.\n");
@@ -191,6 +193,8 @@ int main(int argc, char ** argv) {
     listen_socket = init_listen_socket(7000, running_ptr);
 
     char command_line[50];
+
+    Interface * thingy = new Interface(1, "127.0.0.1", 7000, "127.0.0.1", 7001, "192.168.0.1", "192.168.0.2");
 
     while (1) {
     	// check for user input

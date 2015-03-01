@@ -6,8 +6,6 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 
-using namespace std;
-
 class Interface {
 public:
     int id; // my interface ID
@@ -26,6 +24,7 @@ public:
     Interface(int, char [], int, char [], int, char [], char []);
     void send_packet(char *, struct iphdr *);
 };
+
 
 Interface::Interface (int id_in, char my_ip_in[], int my_port_in, char other_ip_in[], int other_port_in, char my_vip_in[], char other_vip_in[]) {
     id = id_in;
@@ -52,7 +51,7 @@ Interface::Interface (int id_in, char my_ip_in[], int my_port_in, char other_ip_
 void Interface::send_packet(char * data, struct iphdr * ip_header) {
     if (!is_up) return;
 
-	struct sockaddr_in dest_addr;
+    struct sockaddr_in dest_addr;
 
     dest_addr.sin_addr.s_addr = inet_addr(other_ip);
     dest_addr.sin_family = AF_INET;
