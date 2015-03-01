@@ -13,6 +13,8 @@
 using namespace std;
 
 #define MAX_NUM_ROUTING_ENTRIES 64
+#define MAX_MTU_SIZE 1400
+#define LOCALHOST "127.0.0.1"
 
 typedef struct interface {
     int interface_id;
@@ -57,6 +59,7 @@ typedef struct rip_packet {
 
 typedef struct metadata {
     uint32_t port;
+    char my_ip[16];
 } metadata_t;
 
 /* Notes:
@@ -91,6 +94,39 @@ void send_packet_with_interface(interface_t interface, char * data, struct iphdr
     }
 }
 
+void create_ifconfig_entry(int ID, uint16_t port, char *myIP, char *myVIP, char *otherVIP) {
+    interface_t entry;
+    entry.interface_id = ID;
+    entry.my_port = port;
+    strcpy(entry.my_ip,myIP);
+    strcpy(entry.my_vip,myVIP);
+    strcpy(entry.other_vip,otherVIP);
+    entry.is_up = true;
+    entry.mtu_size = MAX_MTU_SIZE;
+
+    IFCONFIG_TABLE.ifconfig_entries[ID] = entry;
+    IFCONFIG_TABLE.num_entries++;    
+}
+
+void build_forwarding_table(FILE *fp) {
+    int ID;
+    char other_port[16], other_vip[16], my_vip[16], myIP[16];
+    uint16_t port;
+
+    ID = 0;
+    while(feof(fp) == false) {
+        fscanf(fp, "%s %s %s", other_port, other_vip, my_vip);
+        
+        strcpy(myIP, strtok (other_port,":"));
+        if(strcmp(myIP, "localhost")==0) {
+            strcpy(myIP, LOCALHOST);
+        } 
+        port = atoi(strtok (NULL,": "));
+
+        create_ifconfig_entry(ID, port, myIP, my_vip, other_vip);
+    }
+}
+
 void build_tables() {
 
     char content[2000], file_name[25];
@@ -110,32 +146,14 @@ void build_tables() {
 
     fscanf(fp, "%s", content);
 
-    char *myIP;
-    myIP = strtok (content,":");
+    strcpy(SELF.my_ip,strtok (content,":"));
     SELF.port = atoi(strtok (NULL,": "));
 
-    printf("myIP: %s\nmyPort: %d\n", myIP, (int) SELF.port);
+    printf("myIP: %s\nmyPort: %d\n", SELF.my_ip, (int) SELF.port);
 
     build_forwarding_table(fp);
 
    fclose(fp);
-}
-
-void build_forwarding_table(FILE *fp) {
-    int ID;
-    char other_port[20], other_ip[20], my_ip[20];
-
-
-    ID = 0;
-    while(feof(fp) == false) {
-        //ifconfig_entry_t
-        //FORWARDING_TABLE[i].
-    }
-}
-
-void create_ifconfig_entry(int ID) {
-    ifconfig_entry_t entry;
-    entry.interface_id = ID;    
 }
 
 void send_packet(uint32_t destination, char * msg) {
@@ -184,7 +202,7 @@ void print_routes() {
     int i;
     for (i = 0; i < FORWARDING_TABLE.num_entries; ++i) {
         forwarding_entry_t entry = FORWARDING_TABLE.forwarding_entries[i];
-        printf("%d %d %d\n", entry.dest_addr, entry.cost, entry.next_hop);
+        printf("%d %d %d\n", entry.dest_addr, entry.cost, entry.interface_id);
     }
     printf("....end finding routes.\n");
 }
