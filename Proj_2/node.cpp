@@ -61,6 +61,10 @@ typedef struct rip_packet {
     } entries[MAX_NUM_ROUTING_ENTRIES];
 } rip_packet_t;
 
+typedef struct metadata {
+    uint32_t port;
+} metadata_t;
+
 /* Notes:
     rip algorithm cases: http://en.wikipedia.org/wiki/Routing_Information_Protocol
     for listening on multiple fd/sockets's simultaneously use fd_set and select() 
@@ -69,6 +73,8 @@ typedef struct rip_packet {
 
 forwarding_table_t FORWARDING_TABLE;
 ifconfig_table_t IFCONFIG_TABLE;
+metadata_t SELF;
+
 
 void initialize_interface(interface_t interface) {
     if ( (interface.send_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
@@ -109,17 +115,33 @@ void build_tables() {
     printf("The contents of %s file are :\n", file_name);
 
     fscanf(fp, "%s", content);
-    printf("%s\n", content);
 
     char *myIP;
-    uint32_t myPort;
-
     myIP = strtok (content,":");
-    printf("%s\n", myIP);
-    myPort = atoi(strtok (NULL,": "));
-    printf("myIP: %s\nmyPort: %d\n", myIP, (int) myPort);
-    
+    SELF.port = atoi(strtok (NULL,": "));
+
+    printf("myIP: %s\nmyPort: %d\n", myIP, (int) SELF.port);
+
+    build_forwarding_table(fp);
+
    fclose(fp);
+}
+
+void build_forwarding_table(FILE *fp) {
+    int ID;
+    char other_port[20], other_ip[20], my_ip[20];
+
+
+    ID = 0;
+    while(feof(fp) == false) {
+        //ifconfig_entry_t
+        //FORWARDING_TABLE[i].
+    }
+}
+
+void create_ifconfig_entry(int ID) {
+    ifconfig_entry_t entry;
+    entry.interface_id = ID;    
 }
 
 void send_packet(uint32_t destination, char * msg) {
