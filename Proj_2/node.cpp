@@ -25,8 +25,8 @@ typedef struct interface {
     int interface_id;
     char my_ip[IP_ADDR_LEN];
     uint16_t my_port;
-    char other_ip[IP_ADDR_LEN];
-    uint16_t other_port;
+    //char other_ip[IP_ADDR_LEN];
+    //uint16_t other_port;
     char my_vip[IP_ADDR_LEN];
     char other_vip[IP_ADDR_LEN];
     int mtu_size;
@@ -39,6 +39,7 @@ typedef struct forwarding_entry {
     char dest_addr[IP_ADDR_LEN];
     int interface_id;
     int cost;
+    time_t last_updated;
 } forwarding_entry_t;
 
 typedef struct forwarding_table {
@@ -103,6 +104,42 @@ void send_packet_with_interface(interface_t * interface, char * data, struct iph
     }
 }
 
+interface_t* get_interface_by_id(int id) {
+    interface_t * temp = IFCONFIG_TABLE.ifconfig_entries;
+    int i;
+    for (i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
+        if(IFCONFIG_TABLE.ifconfig_entries[i].interface_id == id) {
+            return (temp + i);
+        }
+    }
+    return NULL;
+}
+
+interface_t* get_interface_by_dest_addr(char * dest_addr) {
+    interface_t * temp = IFCONFIG_TABLE.ifconfig_entries;
+    int i;
+    for (i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
+        if(strcmp(IFCONFIG_TABLE.ifconfig_entries[i].other_vip, dest_addr) == 0) {
+            return (temp + i);
+        }
+    }
+    return NULL;
+}
+
+forwarding_entry_t* get_forwarding_entry_by_dest_addr(char * dest_addr) {
+    forwarding_entry_t * temp = FORWARDING_TABLE.forwarding_entries;
+    int i;
+    for(i = 0; i< FORWARDING_TABLE.num_entries; i++) {
+        if(strcmp(FORWARDING_TABLE.forwarding_entries[i].dest_addr, dest_addr) == 0) {
+            return (temp + i);
+        }
+    }
+    return NULL;
+}
+
+/**
+* Creates an ifconfig entry and puts it into the ifconfig table
+**/
 void create_ifconfig_entry(int ID, uint16_t port, char *myIP, char *myVIP, char *otherVIP) {
     interface_t entry;
     entry.interface_id = ID;
@@ -118,14 +155,54 @@ void create_ifconfig_entry(int ID, uint16_t port, char *myIP, char *myVIP, char 
     IFCONFIG_TABLE.num_entries++;
 }
 
-void create_forwarding_entry(int ID, char * dest_addr, int cost) {
-    forwarding_entry_t entry;
-    entry.interface_id = ID;
-    strcpy(entry.dest_addr,dest_addr);
-    entry.cost = cost;
+// void create_forwarding_entry(int ID, char * src_addr, char * dest_addr, int cost) {
+//     forwarding_entry_t entry;
+//     entry.interface_id = ID;
+//     strcpy(entry.dest_addr,dest_addr);
+//     strcpy(entry.entry_src_addr, src_addr);
+//     entry.cost = cost;
 
-    FORWARDING_TABLE.forwarding_entries[ID] = entry;
-    FORWARDING_TABLE.num_entries++;
+//     FORWARDING_TABLE.forwarding_entries[ID] = entry;
+//     FORWARDING_TABLE.num_entries++;
+// }
+
+
+//TODO: make timing work
+void update_forwarding_entry(char * src_addr, char * next_addr, char * dest_addr, int cost) {
+    forwarding_entry_t * entry = get_forwarding_entry_by_dest_addr(dest_addr);
+    interface_t * interface = get_interface_by_dest_addr(next_addr);
+    //int current_entry_index = FORWARDING_TABLE.num_entries;
+
+    if (entry == NULL) {
+        if (interface == NULL) {
+            FORWARDING_TABLE.forwarding_entries[FORWARDING_TABLE.num_entries].interface_id = -1;
+        }
+        else {
+            FORWARDING_TABLE.forwarding_entries[FORWARDING_TABLE.num_entries].interface_id = interface-> interface_id;
+        }
+
+        if(cost == MAX_TTL) {
+            FORWARDING_TABLE.forwarding_entries[FORWARDING_TABLE.num_entries].cost = MAX_TTL;
+        }
+        else {
+            FORWARDING_TABLE.forwarding_entries[FORWARDING_TABLE.num_entries].cost = cost + 1;
+        }
+
+        strcpy(FORWARDING_TABLE.forwarding_entries[FORWARDING_TABLE.num_entries].entry_src_addr, src_addr);
+        strcpy(FORWARDING_TABLE.forwarding_entries[FORWARDING_TABLE.num_entries].dest_addr, dest_addr);
+        //FORWARDING_TABLE[FORWARDING_TABLE.num_entries].last_updated = ;
+        FORWARDING_TABLE.num_entries++;
+    }
+    else if((entry -> cost > (cost + 1)) & (entry -> interface_id != -1)) {
+        strcpy(entry -> entry_src_addr, src_addr);
+        entry -> interface_id = interface -> interface_id;
+        entry -> cost = cost + 1;
+        //entry -> last_updated = ;
+    }
+    else if((strcmp(entry -> dest_addr, dest_addr) == 0) & (entry -> cost == (cost + 1))) {
+        //entry -> last_updated = ;
+    } 
+
 }
 
 void build_tables(FILE *fp) {
@@ -144,9 +221,9 @@ void build_tables(FILE *fp) {
         port = atoi(strtok (NULL,": "));
         create_ifconfig_entry(ID, port, myIP, my_vip, other_vip);
 
-        create_forwarding_entry(ID, other_vip, 1);
+        update_forwarding_entry(LOCALHOST, other_vip, other_vip, 0);
+        update_forwarding_entry(LOCALHOST, LOCALHOST, my_vip, -1);
 
-        //update forwarding_table
         ID++;
 
     }
@@ -192,39 +269,6 @@ void load_from_file() {
 //     }
 //     return false;
 // }
-
-interface_t* get_interface_by_id(int id) {
-    interface_t * temp = IFCONFIG_TABLE.ifconfig_entries;
-    int i;
-    for (i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
-        if(IFCONFIG_TABLE.ifconfig_entries[i].interface_id == id) {
-            return (temp + i);
-        }
-    }
-    return NULL;
-}
-
-interface_t* get_interface_by_dest_addr(char * dest_addr) {
-    interface_t * temp = IFCONFIG_TABLE.ifconfig_entries;
-    int i;
-    for (i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
-        if(strcmp(IFCONFIG_TABLE.ifconfig_entries[i].other_vip, dest_addr) == 0) {
-            return (temp + i);
-        }
-    }
-    return NULL;
-}
-
-forwarding_entry_t* get_forwarding_entry_by_dest_addr(char * dest_addr) {
-    forwarding_entry_t * temp = FORWARDING_TABLE.forwarding_entries;
-    int i;
-    for(i = 0; i< FORWARDING_TABLE.num_entries; i++) {
-        if(strcmp(FORWARDING_TABLE.forwarding_entries[i].dest_addr, dest_addr) == 0) {
-            return (temp + i);
-        }
-    }
-    return NULL;
-}
 
 void send_packet(char * dest_addr, char * msg, int msg_size, int TTL, int protocol) {
     forwarding_entry_t *f_entry;
