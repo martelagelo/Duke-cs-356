@@ -167,17 +167,6 @@ void create_ifconfig_entry(int ID, uint16_t port, char *myIP, char *myVIP, char 
     IFCONFIG_TABLE.num_entries++;
 }
 
-// void create_forwarding_entry(int ID, char * src_addr, char * dest_addr, int cost) {
-//     forwarding_entry_t entry;
-//     entry.interface_id = ID;
-//     strcpy(entry.dest_addr,dest_addr);
-//     strcpy(entry.entry_src_addr, src_addr);
-//     entry.cost = cost;
-
-//     FORWARDING_TABLE.forwarding_entries[ID] = entry;
-//     FORWARDING_TABLE.num_entries++;
-// }
-
 
 //TODO: make timing work
 void update_forwarding_entry(char * src_addr, char * next_addr, char * dest_addr, int cost) {
@@ -233,8 +222,8 @@ void build_tables(FILE *fp) {
         port = atoi(strtok (NULL,": "));
         create_ifconfig_entry(ID, port, myIP, my_vip, other_vip);
 
-        update_forwarding_entry(LOCALHOST, other_vip, other_vip, 0);
-        update_forwarding_entry(LOCALHOST, LOCALHOST, my_vip, -1);
+        update_forwarding_entry((char *) LOCALHOST, (char *) other_vip, (char *) other_vip, 0);
+        update_forwarding_entry((char *) LOCALHOST, (char *) LOCALHOST, (char *) my_vip, -1);
 
         ID++;
 
@@ -320,9 +309,6 @@ void send_packet(char * dest_addr, char * msg, int msg_size, int TTL, int protoc
     return;
 }
 
-void forward_packet() {
-
-}
 
 void set_as_up(int ID) {
     interface_t * interface = get_interface_by_id(ID);
@@ -366,6 +352,49 @@ void print_ifconfig() {
     printf("....end ifconfig.\n\n");
 }
 
+/**
+* Sends an RIP update to a specified destination
+**/
+void send_forwarding_update(char * dest_addr) {
+    //refresh_routes();
+
+    rip_packet_t * RIP_packet = (rip_packet_t *) malloc(sizeof(rip_packet_t *));
+    RIP_packet -> command = 2; //Sends a response RIP packet
+    RIP_packet -> num_entries = FORWARDING_TABLE.num_entries;
+
+    int i;
+    for(i = 0; i < FORWARDING_TABLE.num_entries; i++) {
+        RIP_packet -> entries[i].address = inet_addr(FORWARDING_TABLE.forwarding_entries[i].dest_addr);
+        if(strcmp(dest_addr, FORWARDING_TABLE.forwarding_entries[i].entry_src_addr) == 0) {
+            RIP_packet->entries[i].cost = MAX_TTL - 1;
+        }
+        else {
+            RIP_packet-> entries[i].cost = FORWARDING_TABLE.forwarding_entries[i].cost;
+        }
+    }
+    send_packet(dest_addr, (char *) RIP_packet, sizeof(rip_packet_t), MAX_TTL, RIP_PROTOCOL_VAL);
+}
+
+void activate_RIP_update() {
+    int i;
+    for(i = 0; i <IFCONFIG_TABLE.num_entries; i++) {
+        if(IFCONFIG_TABLE.ifconfig_entries[i].is_up) {
+            send_forwarding_update(IFCONFIG_TABLE.ifconfig_entries[i].other_vip);
+        }
+    }
+} 
+
+void request_routes() {
+    int i;
+    for(i = 0; i < IFCONFIG_TABLE.num_entries; i ++ ) {
+        rip_packet_t* RIP_packet = (rip_packet_t *) malloc(sizeof(rip_packet_t *));
+        RIP_packet -> command = 1;
+        RIP_packet -> num_entries = 0;
+
+        send_packet(IFCONFIG_TABLE.ifconfig_entries[i].other_vip, (char *) RIP_packet, sizeof(rip_packet_t), MAX_TTL, RIP_PROTOCOL_VAL);
+    }
+}
+
 void choose_command(char * command) {
     char temp_char;
     int ID;
@@ -378,10 +407,12 @@ void choose_command(char * command) {
     else if (strcmp("up", command) == 0) {
         scanf("%d", &ID);
         set_as_up(ID);
+        activate_RIP_update();
     }
     else if (strcmp("down", command) == 0) {
         scanf("%d", &ID);
         set_as_down(ID);
+        activate_RIP_update();
     }
     else if (strcmp("send", command) == 0) { 
         char dest_addr[20], msg[MAX_MTU_SIZE];
@@ -450,6 +481,9 @@ void handle_packet(int listen_socket) {
         return;
     }
 
+    char src_addr[IP_ADDR_LEN];
+    inet_ntop(AF_INET, &(recv_header->saddr), src_addr, INET_ADDRSTRLEN);
+
     memset(&recv_data_buffer[0], 0, (MAX_RECV_SIZE));
     memcpy(recv_data_buffer, recv_data_ptr, MAX_RECV_SIZE - recv_header->ihl * 4);
 
@@ -461,8 +495,23 @@ void handle_packet(int listen_socket) {
         //else{
             printf("message: %s\n", recv_data_buffer);
         //}
-    } else {
-        printf("Got something other than test protocol: %s\n", recv_data_buffer);
+    } 
+    else if (recv_header->protocol == RIP_PROTOCOL_VAL) {
+        rip_packet_t * RIP_packet = (rip_packet_t *) recv_data_buffer;
+        if(RIP_packet -> command == 1) {
+            send_forwarding_update(src_addr);
+        }
+        else if(RIP_packet -> command == 2) {
+            int i;
+            for(i = 0; i < RIP_packet -> num_entries; i++ ) {
+                char dest[IP_ADDR_LEN];
+                inet_ntop(AF_INET, &(RIP_packet->entries[i].address), dest, INET_ADDRSTRLEN);
+                update_forwarding_entry(src_addr, src_addr, dest, RIP_packet->entries[i].cost);
+            }
+        }
+    }
+    else {
+        printf("Got something other than test or RIP protocol: %s\n", recv_data_buffer);
     }
 }
 
@@ -484,6 +533,8 @@ int main(int argc, char ** argv) {
     listen_socket = init_listen_socket(SELF.port, running_ptr);
 
     char command_line[100];
+
+    request_routes();
 
     while (1) {
         FD_ZERO (running_ptr);
