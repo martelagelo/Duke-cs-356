@@ -83,8 +83,17 @@ void initialize_interface(interface_t * interface) {
     }
 }
 
+
+//Debugging utility
+void print_mem(char const *vp, size_t n)
+{
+    char const *p = vp;
+    for (size_t i=0; i<n; i++)
+        printf("%02x\n", p[i]);
+    putchar('\n');
+};
+
 void send_packet_with_interface(interface_t * interface, char * data, struct iphdr * ip_header) {
-    char full_packet[MAX_MTU_SIZE];
     if (!interface->is_up) return;
 
     struct sockaddr_in dest_addr;
@@ -93,11 +102,14 @@ void send_packet_with_interface(interface_t * interface, char * data, struct iph
     dest_addr.sin_family = AF_INET;
     dest_addr.sin_port = htons(interface->my_port);
 
-    ip_header->ihl = 5;
-    ip_header->tot_len = ip_header->ihl * 4 + strlen(data) * 4;
+
+    ip_header->tot_len = ip_header->ihl * 4 + strlen(data);
     ip_header->check = ip_sum((char*)ip_header, ip_header->ihl * 4);
+    char full_packet[ip_header->tot_len];
+
     memcpy(full_packet, ip_header, ip_header->ihl*4);
-    memcpy(full_packet+ip_header->ihl*4, data, strlen(data));
+    memcpy(full_packet + ip_header->ihl*4, data, strlen(data));
+
     if (sendto(interface->send_socket, full_packet, ip_header->tot_len, 0, (struct sockaddr*) &dest_addr, sizeof(dest_addr)) < 0) {
         perror("Failed to send packet");
     }
@@ -253,9 +265,12 @@ void send_packet(char * dest_addr, char * msg, int msg_size, int TTL, int protoc
     ip_header -> version = 4;
     ip_header -> ttl = TTL;
     ip_header -> protocol = protocol;
-    ip_header -> tot_len = MAX_MTU_SIZE;
+    ip_header -> ihl = 5;
 
-    printf("\n\n\n\n\ngot here\n\n\n\n\n");
+    ip_header -> check = 0;
+    ip_header -> tot_len = 0;
+    ip_header -> frag_off = 0;
+
 
     send_packet_with_interface(interface, msg, ip_header);
     return;
@@ -308,6 +323,7 @@ void print_ifconfig() {
 }
 
 void choose_command(char * command) {
+    char temp_char;
     int ID;
     if(strcmp("ifconfig", command) == 0) {
         print_ifconfig();
@@ -336,6 +352,7 @@ void choose_command(char * command) {
     else {
         printf("\nCommand not found. Please enter a different command.\n");
     }
+    while ((temp_char = getchar()) != '\n' && temp_char != EOF); // clear stdin buffer
 }
 
 
@@ -377,20 +394,20 @@ void handle_packet(int listen_socket) {
     recv(listen_socket, recv_buffer, MAX_RECV_SIZE, 0);
     printf("received raw: %s", recv_buffer);
     recv_header = (struct iphdr *) recv_buffer;
-    recv_data_ptr = (recv_buffer + recv_header->ihl * sizeof(char));
+    recv_data_ptr = (recv_buffer + recv_header->ihl * 4);
+
 
     received_ip_checksum = recv_header->check;
+    recv_header->check = 0;
     calculated_ip_checksum = ip_sum((char *) recv_header, recv_header->ihl * 4);
 
     if(received_ip_checksum != calculated_ip_checksum){ 
         printf("Broken checksum, dropping packet\n");
- //       return;
+        return;
     }
 
-    memset(&recv_data_buffer[0], 0, (MAX_RECV_SIZE * sizeof(char)));
-    memcpy(recv_data_buffer, recv_data_ptr, MAX_RECV_SIZE);
-
-
+    memset(&recv_data_buffer[0], 0, (MAX_RECV_SIZE));
+    memcpy(recv_data_buffer, recv_data_ptr, MAX_RECV_SIZE - recv_header->ihl * 4);
 
     if(recv_header->protocol == TEST_PROTOCOL_VAL){
         //if(isMe(dest_addr) < 0){ // not in the table, need to forward
@@ -431,22 +448,21 @@ int main(int argc, char ** argv) {
     		// handle
 
         need_to_read_set = full_fd_set;
-
+        printf("reached 1");
         if (select (FD_SETSIZE, &need_to_read_set, NULL, NULL, NULL) < 0){ 
             perror ("Select error: ");
             exit (EXIT_FAILURE);
         }
-
         if (FD_ISSET(0, &need_to_read_set)) {
+            printf("reached 2a");
             scanf("%s", command_line);
             //printf( "\n%s", commandLine);
             choose_command(command_line);
-        }
-
-        if (FD_ISSET (listen_socket, &need_to_read_set)){ // data ready on the read socket
+        } else if (FD_ISSET (listen_socket, &need_to_read_set)){ // data ready on the read socket
             //TODO: receive data and pass directly to ALL interfaces
                 // Only an up and directly attached interface (by source port) should act on this and call handle_packet
             handle_packet(listen_socket);
         }
+        printf("reached 4");
     }
 }
