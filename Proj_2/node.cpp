@@ -472,41 +472,48 @@ int main(int argc, char ** argv) {
     load_from_file();
     // initialize routing information
     int listen_socket;
-    fd_set full_fd_set, need_to_read_set;
+    fd_set full_fd_set;
     fd_set *running_ptr;
+    struct timeval timeout;
 
     running_ptr = & full_fd_set;
 
-
-    FD_ZERO (&full_fd_set);
-    FD_SET (0, &full_fd_set);
+    FD_ZERO (running_ptr);
+    FD_SET (STDIN_FILENO, running_ptr);
 
     listen_socket = init_listen_socket(SELF.port, running_ptr);
 
     char command_line[100];
 
     while (1) {
+        FD_ZERO (running_ptr);
+        FD_SET (STDIN_FILENO, running_ptr);
+        FD_SET (listen_socket, running_ptr);
+
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 1000;
     	// check for user input
     		// handle
     	// check for received packet
     		// handle
 
-        need_to_read_set = full_fd_set;
-        printf("reached 1");
-        if (select (FD_SETSIZE, &need_to_read_set, NULL, NULL, NULL) < 0){ 
+        if (select (FD_SETSIZE, running_ptr, NULL, NULL, &timeout) < 0){ 
             perror ("Select error: ");
             exit (EXIT_FAILURE);
         }
-        if (FD_ISSET(0, &need_to_read_set)) {
-            printf("reached 2a");
-            scanf("%s", command_line);
-            //printf( "\n%s", commandLine);
-            choose_command(command_line);
-        } else if (FD_ISSET (listen_socket, &need_to_read_set)){ // data ready on the read socket
+
+        if (FD_ISSET (listen_socket, running_ptr)){ // data ready on the read socket
             //TODO: receive data and pass directly to ALL interfaces
                 // Only an up and directly attached interface (by source port) should act on this and call handle_packet
             handle_packet(listen_socket);
         }
-        printf("reached 4");
+
+        if (FD_ISSET(STDIN_FILENO, running_ptr)) {
+            scanf("%s", command_line);
+            //fgets(command_line, 100, stdin);
+            //printf( "\n%s", commandLine);
+            choose_command(command_line);
+            fflush(STDIN_FILENO);
+        }
     }
 }
