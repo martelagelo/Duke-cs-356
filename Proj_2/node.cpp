@@ -35,6 +35,7 @@ typedef struct interface {
 } interface_t;
 
 typedef struct forwarding_entry {
+    char entry_src_addr[IP_ADDR_LEN];
     char dest_addr[IP_ADDR_LEN];
     int interface_id;
     int cost;
