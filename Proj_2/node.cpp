@@ -262,7 +262,7 @@ bool is_dest_equal_to_me(char * dest_addr) {
     interface_t * temp = IFCONFIG_TABLE.ifconfig_entries;
     int i;
     for (i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
-        if(strcmp(IFCONFIG_TABLE.ifconfig_entries[i].my_vip, dest_addr)) {
+        if(strcmp(IFCONFIG_TABLE.ifconfig_entries[i].my_vip, dest_addr) == 0) {
             return true;
         }
     }
