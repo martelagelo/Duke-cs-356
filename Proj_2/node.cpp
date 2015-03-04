@@ -222,8 +222,8 @@ void build_tables(FILE *fp) {
         port = atoi(strtok (NULL,": "));
         create_ifconfig_entry(ID, port, myIP, my_vip, other_vip);
 
-        update_forwarding_entry((char *) LOCALHOST, (char *) other_vip, (char *) other_vip, 0);
-        update_forwarding_entry((char *) LOCALHOST, (char *) LOCALHOST, (char *) my_vip, -1);
+        update_forwarding_entry((char *) myIP, (char *) other_vip, (char *) other_vip, 0);
+        update_forwarding_entry((char *) myIP, (char *) myIP, (char *) my_vip, -1);
 
         ID++;
 
