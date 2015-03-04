@@ -1,1 +1,11 @@
-Hello
+README: Project-2: IP-Project
+
+Class: CS 356
+
+Team Members: Michael Deng			Robert Ansel
+
+Compile Instructions:
+	g++ node.cpp ipsum.c
+	./a.out
+
+
