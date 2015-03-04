@@ -172,8 +172,7 @@ void create_ifconfig_entry(int ID, uint16_t port, char *myIP, char *myVIP, char 
 void update_forwarding_entry(char * src_addr, char * next_addr, char * dest_addr, int cost) {
     forwarding_entry_t * entry = get_forwarding_entry_by_dest_addr(dest_addr);
     interface_t * interface = get_interface_by_dest_addr(next_addr);
-    //int current_entry_index = FORWARDING_TABLE.num_entries;
-
+    
     if (entry == NULL) {
         if (interface == NULL) {
             FORWARDING_TABLE.forwarding_entries[FORWARDING_TABLE.num_entries].interface_id = -1;
@@ -236,7 +235,6 @@ void load_from_file() {
     FILE *fp;
     printf("Enter file name you wish to upload\n");
     gets(file_name);
-    //printf("%s\n", file_name);
 
     fp = fopen(file_name,"r");
 
@@ -260,16 +258,16 @@ void load_from_file() {
    fclose(fp);
 }
 
-// bool is_dest_equal_to_me(char * dest_addr) {
-//     interface_t * temp = IFCONFIG_TABLE.ifconfig_entries;
-//     int i;
-//     for (i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
-//         if(strcmp(IFCONFIG_TABLE.ifconfig_entries[i].my_vip, dest_addr)) {
-//             return true;
-//         }
-//     }
-//     return false;
-// }
+bool is_dest_equal_to_me(char * dest_addr) {
+    interface_t * temp = IFCONFIG_TABLE.ifconfig_entries;
+    int i;
+    for (i = 0; i< IFCONFIG_TABLE.num_entries; i++) {
+        if(strcmp(IFCONFIG_TABLE.ifconfig_entries[i].my_vip, dest_addr)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 void send_packet(char * dest_addr, char * msg, int msg_size, int TTL, int protocol) {
     forwarding_entry_t *f_entry;
@@ -482,19 +480,20 @@ void handle_packet(int listen_socket) {
     }
 
     char src_addr[IP_ADDR_LEN];
+    char dest_addr[IP_ADDR_LEN];
     inet_ntop(AF_INET, &(recv_header->saddr), src_addr, INET_ADDRSTRLEN);
+    inet_ntop(AF_INET, &(recv_header->daddr), dest_addr, INET_ADDRSTRLEN);
 
     memset(&recv_data_buffer[0], 0, (MAX_RECV_SIZE));
     memcpy(recv_data_buffer, recv_data_ptr, MAX_RECV_SIZE - recv_header->ihl * 4);
 
     if(recv_header->protocol == TEST_PROTOCOL_VAL){
-        //if(isMe(dest_addr) < 0){ // not in the table, need to forward
-        //    int df_bit = (recv_ip->frag_off & IP_DF) == IP_DF;
-        //    send_packet(dest_addr, payload, strlen(payload), df_bit, (recv_ip->ttl) - 1, recv_ip->protocol, recv_ip->ihl); // decrement ttl by 1
-        //}
-        //else{
+        if(is_dest_equal_to_me(dest_addr)) {
             printf("message: %s\n", recv_data_buffer);
-        //}
+        }
+        else {
+            send_packet((char *) dest_addr, recv_data_buffer, strlen(recv_data_buffer), (recv_header->ttl) - 1, recv_header -> protocol);
+        }
     } 
     else if (recv_header->protocol == RIP_PROTOCOL_VAL) {
         rip_packet_t * RIP_packet = (rip_packet_t *) recv_data_buffer;
