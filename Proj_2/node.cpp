@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <fcntl.h>
+#include <time.h>
 #include "ipsum.h"
 
 using namespace std;
@@ -190,17 +191,17 @@ void update_forwarding_entry(char * src_addr, char * next_addr, char * dest_addr
 
         strcpy(FORWARDING_TABLE.forwarding_entries[FORWARDING_TABLE.num_entries].entry_src_addr, src_addr);
         strcpy(FORWARDING_TABLE.forwarding_entries[FORWARDING_TABLE.num_entries].dest_addr, dest_addr);
-        //FORWARDING_TABLE[FORWARDING_TABLE.num_entries].last_updated = ;
+        FORWARDING_TABLE.forwarding_entries[FORWARDING_TABLE.num_entries].last_updated = time(NULL);
         FORWARDING_TABLE.num_entries++;
     }
     else if((entry -> cost > (cost + 1)) & (entry -> interface_id != -1)) {
         strcpy(entry -> entry_src_addr, src_addr);
         entry -> interface_id = interface -> interface_id;
         entry -> cost = cost + 1;
-        //entry -> last_updated = ;
+        entry -> last_updated = time(NULL);
     }
     else if((strcmp(entry -> dest_addr, dest_addr) == 0) & (entry -> cost == (cost + 1))) {
-        //entry -> last_updated = ;
+        entry -> last_updated = time(NULL);
     } 
 
 }
@@ -397,6 +398,19 @@ void request_routes() {
     }
 }
 
+void check_for_expired_routes() {
+    forwarding_entry_t * forwarding_entries = FORWARDING_TABLE.forwarding_entries;
+    
+    int i;
+    for(i = 0; i < FORWARDING_TABLE.num_entries; i += 1){
+        if (forwarding_entries[i].interface_id != -1 & ((int) time(NULL) - (int) forwarding_entries[i].last_updated > 12)) {
+            printf("found expired entry!");
+            forwarding_entries[i].cost = 16; // entry expired
+            forwarding_entries[i].last_updated = time(NULL);
+        }
+    }
+}
+
 void choose_command(char * command) {
     char temp_char;
     int ID;
@@ -483,6 +497,11 @@ void handle_packet(int listen_socket) {
         return;
     }
 
+    if(recv_header->ttl <= 0) {
+        printf("TTL surpassed, dropping packet\n");
+        return;
+    }
+
     char src_addr[IP_ADDR_LEN];
     char dest_addr[IP_ADDR_LEN];
     inet_ntop(AF_INET, &(recv_header->saddr), src_addr, INET_ADDRSTRLEN);
@@ -493,7 +512,7 @@ void handle_packet(int listen_socket) {
 
     if(recv_header->protocol == TEST_PROTOCOL_VAL){
         if(is_dest_equal_to_me(dest_addr)) {
-            printf("message: %s\n", recv_data_buffer);
+            printf("Received Message: %s\n", recv_data_buffer);
         }
         else {
             send_packet((char *) dest_addr, recv_data_buffer, strlen(recv_data_buffer), (recv_header->ttl) - 1, recv_header -> protocol);
@@ -528,15 +547,16 @@ int main(int argc, char ** argv) {
     fd_set full_fd_set;
     fd_set *running_ptr;
     struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 1000;
+
+    time_t last_updated;
+    time(&last_updated);
 
     running_ptr = & full_fd_set;
-
-    FD_ZERO (running_ptr);
-    FD_SET (STDIN_FILENO, running_ptr);
-
     listen_socket = init_listen_socket(SELF.port, running_ptr);
 
-    char command_line[100];
+    char command_line[1500];
 
     request_routes();
 
@@ -545,12 +565,10 @@ int main(int argc, char ** argv) {
         FD_SET (STDIN_FILENO, running_ptr);
         FD_SET (listen_socket, running_ptr);
 
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 1000;
-    	// check for user input
-    		// handle
-    	// check for received packet
-    		// handle
+        // check for user input
+            // handle
+        // check for received packet
+            // handle
 
         if (select (FD_SETSIZE, running_ptr, NULL, NULL, &timeout) < 0){ 
             perror ("Select error: ");
@@ -570,5 +588,12 @@ int main(int argc, char ** argv) {
             choose_command(command_line);
             fflush(STDIN_FILENO);
         }
+
+        if ( ((int)time(NULL)-(int)last_updated) >= 5) {
+            request_routes();
+            time(&last_updated);
+            //printf("been 5 seconds\n");
+        }
+        check_for_expired_routes();
     }
 }
