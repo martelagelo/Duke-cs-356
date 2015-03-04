@@ -315,6 +315,8 @@ void set_as_up(int ID) {
         return;
     }
     interface->is_up = true;
+    forwarding_entry_t * entry = get_forwarding_entry_by_dest_addr(IFCONFIG_TABLE.ifconfig_entries[ID].my_vip);
+    entry -> cost = 0; 
     printf("\nInterface %d is up.\n\n", ID);
     return;
 }
@@ -326,6 +328,8 @@ void set_as_down(int ID) {
         return;
     }
     interface->is_up = false;
+    forwarding_entry_t * entry = get_forwarding_entry_by_dest_addr(IFCONFIG_TABLE.ifconfig_entries[ID].my_vip);
+    entry -> cost = MAX_TTL;
     printf("\nInterface %d is down.\n\n", ID);
     return;
 }
