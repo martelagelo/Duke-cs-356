@@ -94,7 +94,7 @@ void print_mem(char const *vp, size_t n)
     putchar('\n');
 };
 
-void send_packet_with_interface(interface_t * interface, char * data, struct iphdr * ip_header) {
+void send_packet_with_interface(interface_t * interface, char * data, int data_size, struct iphdr * ip_header) {
     if (!interface->is_up) return;
 
     struct sockaddr_in dest_addr;
@@ -104,12 +104,12 @@ void send_packet_with_interface(interface_t * interface, char * data, struct iph
     dest_addr.sin_port = htons(interface->my_port);
 
 
-    ip_header->tot_len = ip_header->ihl * 4 + strlen(data);
+    ip_header->tot_len = ip_header->ihl * 4 + data_size;
     ip_header->check = ip_sum((char*)ip_header, ip_header->ihl * 4);
     char full_packet[ip_header->tot_len];
 
     memcpy(full_packet, ip_header, ip_header->ihl*4);
-    memcpy(full_packet + ip_header->ihl*4, data, strlen(data));
+    memcpy(full_packet + ip_header->ihl*4, data, data_size);
 
     if (sendto(interface->send_socket, full_packet, ip_header->tot_len, 0, (struct sockaddr*) &dest_addr, sizeof(dest_addr)) < 0) {
         perror("Failed to send packet");
@@ -305,7 +305,7 @@ void send_packet(char * dest_addr, char * msg, int msg_size, int TTL, int protoc
     ip_header -> frag_off = 0;
 
 
-    send_packet_with_interface(interface, msg, ip_header);
+    send_packet_with_interface(interface, msg, msg_size, ip_header);
     return;
 }
 
@@ -401,7 +401,7 @@ void choose_command(char * command) {
     if(strcmp("ifconfig", command) == 0) {
         print_ifconfig();
     }
-    else if (strcmp("route", command) == 0) {
+    else if (strcmp("routes", command) == 0) {
         print_routes();
     }
     else if (strcmp("up", command) == 0) {
@@ -467,7 +467,7 @@ void handle_packet(int listen_socket) {
     memset(&recv_buffer[0], 0, (MAX_RECV_SIZE * sizeof(char)));
 
     recv(listen_socket, recv_buffer, MAX_RECV_SIZE, 0);
-    printf("received raw: %s", recv_buffer);
+    printf("Received Packet\n");
     recv_header = (struct iphdr *) recv_buffer;
     recv_data_ptr = (recv_buffer + recv_header->ihl * 4);
 
@@ -503,6 +503,7 @@ void handle_packet(int listen_socket) {
         }
         else if(RIP_packet -> command == 2) {
             int i;
+            printf("Updating %d forwarding entries", RIP_packet->num_entries);
             for(i = 0; i < RIP_packet -> num_entries; i++ ) {
                 char dest[IP_ADDR_LEN];
                 inet_ntop(AF_INET, &(RIP_packet->entries[i].address), dest, INET_ADDRSTRLEN);
