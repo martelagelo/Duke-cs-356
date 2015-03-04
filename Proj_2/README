@@ -9,3 +9,19 @@ Compile Instructions:
 	./a.out
 
 
+Forwarding: 
+
+Forwarding is done in two steps: first sending a packet, and then handling a received packet. Forwarding is performed specifically in the receive step.
+When sending a packet, the application first finds an interface entry in the ifconfig table by ID and a route in the forwarding table by address. If either one of these two entries do not exist, then program simply returns. After that, an ip header is created and all the necessary information is filled in for the ip header to be used. After that the header, the interface, and the msg are sent to another method, where the necessary sockets and sending procedures are put in place to send the packet off.
+When a packet is received by an interace on another node, it first checks to see if the checksum is incorrect. If it is correct, then the node makes sure that the TTL of the packet has not passed its lifetime. If both of these checks are passed, then the node will decide what to do with the packet based on its ip protocol. Forwarding occures when the ip protocol is equal to zero, AKA Test Protocol. If the message is actually a test protocol message, the node sorts through its ifconfig table to see if the destination of the packetis equal to one of the source address of its own interfaces. If this is true, the program prints the messge. If this is false, the node knows to forward the packet and sends the packet along with an incremented TTL.
+
+
+
+
+Routing:
+
+
+
+
+
+Extra-Credit:
